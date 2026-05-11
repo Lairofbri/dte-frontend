@@ -5,7 +5,8 @@ import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.store';
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading       = useAuthStore((s) => s.isLoading);
 
   // Mostrar spinner mientras verifica la sesión
   if (isLoading) {

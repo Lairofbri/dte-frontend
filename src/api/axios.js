@@ -9,6 +9,8 @@
 // → Cola de requests pendientes durante el refresh
 
 import axios from 'axios';
+// Import estático — require() no existe en ESM/Vite
+import { useAuthStore } from '../store/auth.store';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -31,30 +33,24 @@ let colaEspera      = [];
 
 const procesarCola = (error, token = null) => {
   colaEspera.forEach(({ resolve, reject }) => {
-    if (error) {
-      reject(error);
-    } else {
-      resolve(token);
-    }
+    if (error) reject(error);
+    else       resolve(token);
   });
   colaEspera = [];
 };
 
 // ─────────────────────────────────────────────
 // Interceptor de REQUEST
-// Agrega el Authorization: Bearer antes de cada request
+// Agrega Authorization: Bearer antes de cada request
+// Usa getState() — acceso directo al store sin hooks
 // ─────────────────────────────────────────────
 api.interceptors.request.use(
   (config) => {
-    // Obtener el access token del store de Zustand
-    // Importación dinámica para evitar dependencia circular
-    const { useAuthStore } = require('../store/auth.store');
+    // getState() accede al store sin necesitar un hook de React
     const token = useAuthStore.getState().accessToken;
-
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-
     return config;
   },
   (error) => Promise.reject(error)
@@ -69,7 +65,7 @@ api.interceptors.response.use(
   async (error) => {
     const requestOriginal = error.config;
 
-    // Solo intentar refresh en errores 401 que no sean del propio refresh
+    // Solo intentar refresh en 401 que no sean del propio login/refresh
     if (
       error.response?.status === 401 &&
       !requestOriginal._reintentado &&
@@ -90,29 +86,20 @@ api.interceptors.response.use(
       estaRefrescando = true;
 
       try {
-        // Intentar renovar el access token
-        // La cookie httpOnly se envía automáticamente
-        const respuesta = await api.post('/api/auth/refresh');
+        const respuesta  = await api.post('/api/auth/refresh');
         const nuevoToken = respuesta.data.data.access_token;
 
         // Actualizar el store con el nuevo token
-        const { useAuthStore } = require('../store/auth.store');
         useAuthStore.getState().setAccessToken(nuevoToken);
 
-        // Procesar la cola de requests pendientes
         procesarCola(null, nuevoToken);
 
-        // Reintentar el request original con el nuevo token
         requestOriginal.headers.Authorization = `Bearer ${nuevoToken}`;
         return api(requestOriginal);
 
       } catch (errorRefresh) {
-        // El refresh falló — logout y redirigir al login
         procesarCola(errorRefresh, null);
-
-        const { useAuthStore } = require('../store/auth.store');
         useAuthStore.getState().logout();
-
         window.location.href = '/login';
         return Promise.reject(errorRefresh);
 

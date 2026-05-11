@@ -14,7 +14,7 @@ import {
   ChevronLeft,
   Zap,
 } from 'lucide-react';
-import { useAuthStore } from '../../store/auth.store';
+import { useAuthStore, selectEsAdmin, selectUsuario } from '../../store/auth.store';
 
 // ─────────────────────────────────────────────
 // Definición de rutas del sidebar
@@ -64,8 +64,8 @@ const adminItems = [
 ];
 
 const Sidebar = ({ isOpen, onClose }) => {
-  const { usuario } = useAuthStore();
-  const esAdmin = usuario?.rol === 'administrador';
+  const usuario = useAuthStore(selectUsuario);
+  const esAdmin = useAuthStore(selectEsAdmin);
 
   return (
     <>
@@ -166,7 +166,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center shrink-0">
               <span className="text-white text-sm font-semibold">
-                {usuario?.nombre?.charAt(0).toUpperCase()}
+                {usuario?.nombre?.charAt(0)?.toUpperCase() ?? '?'}
               </span>
             </div>
             <div className="min-w-0">

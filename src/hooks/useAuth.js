@@ -1,6 +1,9 @@
 // src/hooks/useAuth.js
 // Lógica de autenticación reutilizable
-// Orquesta: API → Store → UI
+//
+// Fix CUBIC: guardar el access token en el store ANTES de llamar meApi()
+// → el interceptor de axios necesita el token para enviar Authorization
+// → si no está en el store, meApi() recibe 401 y entra en bucle
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,12 +14,10 @@ import { useAuthStore } from '../store/auth.store';
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate  = useNavigate();
-  const { setAuth, logout: limpiarStore, setLoading } = useAuthStore();
+  const { setAuth, logout: limpiarStore, setLoading, setAccessToken } = useAuthStore();
 
   /**
    * Login con email + password
-   * Guarda el access token en memoria (Zustand)
-   * El refresh token llega en httpOnly cookie automáticamente
    */
   const login = async ({ email, password }) => {
     setIsLoading(true);
@@ -51,20 +52,29 @@ export const useAuth = () => {
 
   /**
    * Verificar si hay sesión activa al cargar la app
-   * Intenta renovar el access token usando la cookie httpOnly
-   * Si falla → no hay sesión activa
+   * Fix CUBIC: guardar el access token ANTES de llamar meApi()
+   * para que el interceptor de axios pueda enviarlo en el header
    */
   const verificarSesion = async () => {
     setLoading(true);
     try {
+      // 1. Obtener nuevo access token con la cookie httpOnly
       const resultado = await refreshApi();
-      const usuario   = await meApi();
+
+      // 2. Guardar el token en el store ANTES de llamar meApi()
+      //    El interceptor lo necesita para enviar Authorization: Bearer
+      setAccessToken(resultado.access_token);
+
+      // 3. Ahora sí llamar a meApi() — el interceptor ya tiene el token
+      const usuario = await meApi();
+
+      // 4. Actualizar el store completo con usuario
       setAuth({
         accessToken: resultado.access_token,
         usuario,
       });
     } catch (_) {
-      // No hay sesión activa — usuario debe hacer login
+      // No hay sesión activa
       limpiarStore();
     } finally {
       setLoading(false);
