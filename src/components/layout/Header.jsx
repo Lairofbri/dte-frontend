@@ -29,6 +29,7 @@ const Header = ({ onMenuClick, titulo }) => {
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
+          aria-label="Abrir menú de navegación"
           className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
         >
           <Menu className="w-5 h-5" />
@@ -42,7 +43,10 @@ const Header = ({ onMenuClick, titulo }) => {
 
       {/* Lado derecho — notificaciones y logout */}
       <div className="flex items-center gap-2">
-        <button className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors relative">
+        <button
+          aria-label="Notificaciones"
+          className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors relative"
+        >
           <Bell className="w-5 h-5" />
         </button>
 
