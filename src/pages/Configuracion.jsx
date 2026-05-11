@@ -1,0 +1,1 @@
+const Configuracion = () => <div>Configuracion</div>; export default Configuracion;

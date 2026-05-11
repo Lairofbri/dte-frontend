@@ -1,0 +1,1 @@
+const DTEListado = () => <div>DTEListado</div>; export default DTEListado;
