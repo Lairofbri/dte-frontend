@@ -31,6 +31,9 @@ export const useAuth = () => {
     } catch (err) {
       const mensaje = err.response?.data?.mensaje || 'Error al iniciar sesión.';
       toast.error(mensaje);
+      // Re-lanzar para que el componente pueda manejar el error
+      // por ejemplo limpiar el campo de password en el formulario
+      throw err;
     } finally {
       setIsLoading(false);
     }
