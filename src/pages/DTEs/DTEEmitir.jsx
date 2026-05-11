@@ -1,0 +1,1 @@
+const DTEEmitir = () => <div>DTEEmitir</div>; export default DTEEmitir;

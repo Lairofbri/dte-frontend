@@ -1,0 +1,1 @@
+const Establecimientos = () => <div>Establecimientos</div>; export default Establecimientos;
