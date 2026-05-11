@@ -21,7 +21,7 @@ export const CREDENCIALES = {
  * Más rápido que llenar el formulario en cada prueba
  */
 export const loginComoAdmin = async (page) => {
-  await page.goto('http://localhost:5173/login');
+  await page.goto('/login');
   await page.fill('#email',    CREDENCIALES.admin.email);
   await page.fill('#password', CREDENCIALES.admin.password);
   await page.click('button[type="submit"]');

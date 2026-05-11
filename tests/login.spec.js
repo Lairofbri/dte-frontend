@@ -100,7 +100,7 @@ test.describe('Login', () => {
     await loginComoAdmin(page);
 
     // Intentar ir al login manualmente
-    await page.goto('http://localhost:5173/login');
+    await page.goto('/login');
 
     // Debe redirigir al dashboard automáticamente
     await expect(page).toHaveURL(/dashboard/);
