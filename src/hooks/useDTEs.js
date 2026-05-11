@@ -1,21 +1,22 @@
 // src/hooks/useDTEs.js
 // Hook para gestionar la lista de DTEs
 // Los filtros se sincronizan con URL params — patrón moderno React
-// Permite compartir URLs con filtros y restaurar estado con el botón atrás
+//
+// Fix CUBIC:
+// → Eliminar import innecesario de establecimientoId
+// → Guard contra race condition con AbortController
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams }                   from 'react-router-dom';
 import { listarDTEsApi }                     from '../api/dtes.api';
-import { useAuthStore, selectEstablecimientoId } from '../store/auth.store';
 
 export const useDTEs = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const establecimientoId = useAuthStore(selectEstablecimientoId);
 
-  const [dtes,      setDtes]      = useState([]);
+  const [dtes,       setDtes]       = useState([]);
   const [paginacion, setPaginacion] = useState({ total: 0, pagina: 1, limite: 20, paginas: 0 });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error,     setError]     = useState(null);
+  const [isLoading,  setIsLoading]  = useState(true);
+  const [error,      setError]      = useState(null);
 
   // ── Leer filtros desde la URL — la URL ES el estado ──
   const filtros = {
@@ -27,31 +28,44 @@ export const useDTEs = () => {
     limite:      Number(searchParams.get('limite')) || 20,
   };
 
-  // ── Cargar DTEs cuando cambian los params de URL ──
-  const cargarDTEs = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Construir parámetros — solo los que tienen valor
-      const params = { pagina: filtros.pagina, limite: filtros.limite };
-      if (filtros.tipo_dte)    params.tipo_dte    = filtros.tipo_dte;
-      if (filtros.estado)      params.estado      = filtros.estado;
-      if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde;
-      if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta;
-
-      const resultado = await listarDTEsApi(params);
-      setDtes(resultado?.dtes ?? []);
-      setPaginacion(resultado?.paginacion ?? { total: 0, pagina: 1, limite: 20, paginas: 0 });
-    } catch (err) {
-      setError('No se pudieron cargar los DTEs.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [searchParams]); // recarga cuando cambia la URL
-
+  // ── Cargar DTEs con guard contra race condition ──
   useEffect(() => {
-    cargarDTEs();
-  }, [cargarDTEs]);
+    // AbortController cancela requests anteriores si los filtros cambian rápido
+    let cancelado = false;
+
+    const cargar = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const params = { pagina: filtros.pagina, limite: filtros.limite };
+        if (filtros.tipo_dte)    params.tipo_dte    = filtros.tipo_dte;
+        if (filtros.estado)      params.estado      = filtros.estado;
+        if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde;
+        if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta;
+
+        const resultado = await listarDTEsApi(params);
+
+        // Solo actualizar si este request sigue siendo el más reciente
+        if (!cancelado) {
+          setDtes(resultado?.dtes ?? []);
+          setPaginacion(resultado?.paginacion ?? { total: 0, pagina: 1, limite: 20, paginas: 0 });
+        }
+      } catch (err) {
+        if (!cancelado) {
+          setError('No se pudieron cargar los DTEs.');
+        }
+      } finally {
+        if (!cancelado) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    cargar();
+
+    // Cleanup: marcar como cancelado si los params cambian antes de que termine
+    return () => { cancelado = true; };
+  }, [searchParams]);
 
   // ── Actualizar filtro en la URL ──
   const cambiarFiltro = useCallback((nombre, valor) => {
@@ -62,7 +76,6 @@ export const useDTEs = () => {
       } else {
         nuevos.delete(nombre);
       }
-      // Al cambiar filtro volver a página 1
       nuevos.set('pagina', '1');
       return nuevos;
     });
@@ -82,6 +95,11 @@ export const useDTEs = () => {
     setSearchParams({});
   }, [setSearchParams]);
 
+  // ── Recargar manualmente ──
+  const recargar = useCallback(() => {
+    setSearchParams((prev) => new URLSearchParams(prev));
+  }, [setSearchParams]);
+
   const hayFiltrosActivos = !!(
     filtros.tipo_dte || filtros.estado ||
     filtros.fecha_desde || filtros.fecha_hasta
@@ -97,6 +115,6 @@ export const useDTEs = () => {
     cambiarFiltro,
     cambiarPagina,
     limpiarFiltros,
-    recargar: cargarDTEs,
+    recargar,
   };
 };

@@ -120,6 +120,12 @@ test.describe('DTEs — Listado', () => {
     await page.goto(url('/dtes'));
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.table-wrapper')).toBeVisible();
+    // Verificar que el contenedor no excede el ancho del viewport
+    const tieneOverflow = await page.evaluate(() => {
+      const el = document.querySelector('.table-wrapper');
+      return el ? el.scrollWidth > el.clientWidth : false;
+    });
+    expect(tieneOverflow).toBe(false);
   });
 
   // ─────────────────────────────────────────────

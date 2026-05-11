@@ -2,6 +2,7 @@
 // Sidebar colapsable — expandido muestra icono + texto, colapsado solo iconos
 // En móvil se comporta como overlay
 
+import React          from 'react';
 import { NavLink }    from 'react-router-dom';
 import {
   LayoutDashboard, FileText, AlertTriangle,
@@ -27,14 +28,30 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
   const usuario = useAuthStore(selectUsuario);
   const esAdmin = useAuthStore(selectEsAdmin);
 
+  // En móvil nunca colapsar — el toggle es solo para desktop
+  // Detectar si estamos en desktop via CSS media query
+  const [esDesktop, setEsDesktop] = React.useState(
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
+
+  React.useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e) => setEsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // Solo colapsar si estamos en desktop
+  const esColapsado = isCollapsed && esDesktop;
+
   const renderLink = (item) => (
     <NavLink
       key={item.path}
       to={item.path}
       onClick={() => { if (window.innerWidth < 1024) onClose(); }}
-      title={isCollapsed ? item.label : undefined}
+      title={esColapsado ? item.label : undefined}
       className={({ isActive }) =>
-        `sidebar-link ${isActive ? 'active' : ''} ${isCollapsed ? 'justify-center px-2' : ''}`
+        `sidebar-link ${isActive ? 'active' : ''} ${esColapsado ? 'justify-center px-2' : ''}`
       }
     >
       <item.icon className="w-[18px] h-[18px] shrink-0" aria-hidden="true" />
@@ -60,7 +77,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
           transition-all duration-300 ease-in-out
           lg:static lg:z-auto lg:translate-x-0
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          ${isCollapsed ? 'w-16' : 'w-64'}
+          ${esColapsado ? 'lg:w-16' : ''}
         `}
       >
         {/* Logo */}
@@ -70,7 +87,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
           <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
             <Zap className="w-4 h-4 text-white" aria-hidden="true" />
           </div>
-          {!isCollapsed && (
+          {!esColapsado && (
             <div className="min-w-0">
               <p className="text-white font-semibold text-sm font-sans leading-none truncate">
                 DTE Service
@@ -101,14 +118,14 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
 
           {esAdmin && (
             <>
-              {!isCollapsed && (
+              {!esColapsado && (
                 <div className="pt-4 pb-2 px-2">
                   <p className="text-sidebar-text text-xs font-medium uppercase tracking-wider">
                     Administración
                   </p>
                 </div>
               )}
-              {isCollapsed && <div className="pt-2 border-t border-white/10 mt-2" />}
+              {esColapsado && <div className="pt-2 border-t border-white/10 mt-2" />}
               {adminItems.map(renderLink)}
             </>
           )}
@@ -116,7 +133,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
 
         {/* Footer — usuario + botón colapsar */}
         <div className={`border-t border-white/10 p-3 flex items-center
-          ${isCollapsed ? 'flex-col gap-2' : 'gap-3'}`}
+          ${esColapsado ? 'flex-col gap-2' : 'gap-3'}`}
         >
           {/* Avatar */}
           <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center shrink-0">
@@ -126,7 +143,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
           </div>
 
           {/* Nombre — solo expandido */}
-          {!isCollapsed && (
+          {!esColapsado && (
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">{usuario?.nombre}</p>
               <p className="text-sidebar-text text-xs capitalize">{usuario?.rol}</p>
