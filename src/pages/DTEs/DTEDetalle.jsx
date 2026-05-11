@@ -66,8 +66,11 @@ const TimelineDTE = ({ estado }) => {
               {paso.label}
             </div>
             {idx < PASOS_TIMELINE.length - 1 && (
-              <div className={`w-4 h-px ${completado ? 'bg-green-300' : 'bg-gray-200'}`} />
-            )}
+              <div className={`w-4 h-px ${
+                ORDEN_ESTADOS.indexOf(PASOS_TIMELINE[idx + 1]?.estado) <= indiceActual && !esRechazado
+                ? 'bg-green-300' : 'bg-gray-200'
+              }`} />
+              )}  
           </div>
         );
       })}
