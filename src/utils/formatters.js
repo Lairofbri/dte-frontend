@@ -7,10 +7,12 @@
  */
 export const formatMonto = (monto) => {
   if (monto === null || monto === undefined) return '$0.00';
+  const num = Number(monto);
+  if (isNaN(num)) return '$0.00';
   return new Intl.NumberFormat('en-US', {
     style:    'currency',
     currency: 'USD',
-  }).format(Number(monto));
+  }).format(num);
 };
 
 /**
@@ -19,7 +21,9 @@ export const formatMonto = (monto) => {
  */
 export const formatFecha = (fecha) => {
   if (!fecha) return '—';
-  return new Date(fecha).toLocaleDateString('es-SV', {
+  const d = new Date(fecha);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('es-SV', {
     day:   '2-digit',
     month: '2-digit',
     year:  'numeric',
@@ -32,7 +36,9 @@ export const formatFecha = (fecha) => {
  */
 export const formatFechaHora = (fecha) => {
   if (!fecha) return '—';
-  return new Date(fecha).toLocaleString('es-SV', {
+  const d = new Date(fecha);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('es-SV', {
     day:    '2-digit',
     month:  '2-digit',
     year:   'numeric',
