@@ -64,8 +64,8 @@ const Login = () => {
     } catch (err) {
       // El error ya fue manejado en useAuth con toast
       // pero también mostramos el mensaje inline en el formulario
-      const mensaje = err?.response?.data?.mensaje || 'Credenciales inválidas.';
-      setErrorGeneral(mensaje);
+      // El backend puede cambiar sus mensajes — el frontend no debe depender de ellos
+        setErrorGeneral('Correo o contraseña incorrectos.');
       // Limpiar solo el password — no el email
       reset({ email: datos.email, password: '' });
     }
