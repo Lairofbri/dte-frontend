@@ -2,10 +2,13 @@
 // Página de login del DTE Service
 //
 // SEGURIDAD:
-// → Mensaje de error genérico — no revelar si el email existe
+// → Mensaje de error fijo — no revelar si el email existe
 // → Password se limpia después del submit fallido
 // → No se loguea ninguna credencial
 // → Si ya hay sesión activa → redirige al dashboard
+//
+// Fix: todos los hooks ANTES de cualquier return condicional
+// → Regla de React: nunca llamar hooks después de un return
 
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
@@ -18,9 +21,6 @@ import { useAuth } from '../hooks/useAuth';
 
 // ─────────────────────────────────────────────
 // SCHEMA DE VALIDACIÓN ZOD
-// Sin validación de complejidad en login —
-// solo verificar que no están vacíos
-// La complejidad se valida al crear/actualizar el usuario
 // ─────────────────────────────────────────────
 const loginSchema = z.object({
   email: z
@@ -29,7 +29,7 @@ const loginSchema = z.object({
     .email('El email no tiene un formato válido.'),
   password: z
     .string()
-    .min(1, 'El password es requerido.'),
+    .min(1, 'La contraseña es requerida.'),
 });
 
 // ─────────────────────────────────────────────
@@ -42,11 +42,8 @@ const Login = () => {
   const isAuthenticated = useAuthStore(selectIsAuthenticated);
   const { login, isLoading } = useAuth();
 
-  // Si ya hay sesión activa → redirigir al dashboard
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
+  // TODOS los hooks ANTES del return condicional
+  // Fix: useForm declarado UNA SOLA VEZ aquí
   const {
     register,
     handleSubmit,
@@ -57,16 +54,19 @@ const Login = () => {
     defaultValues: { email: '', password: '' },
   });
 
+  // Return condicional DESPUÉS de todos los hooks
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const onSubmit = async (datos) => {
     setErrorGeneral('');
     try {
       await login({ email: datos.email, password: datos.password });
-    } catch (err) {
-      // El error ya fue manejado en useAuth con toast
-      // pero también mostramos el mensaje inline en el formulario
-      // El backend puede cambiar sus mensajes — el frontend no debe depender de ellos
-        setErrorGeneral('Correo o contraseña incorrectos.');
-      // Limpiar solo el password — no el email
+    } catch (_) {
+      // Mensaje fijo — nunca del API (lección de CUBIC)
+      setErrorGeneral('Correo o contraseña incorrectos.');
+      // Limpiar solo el password — mantener el email
       reset({ email: datos.email, password: '' });
     }
   };
@@ -96,7 +96,7 @@ const Login = () => {
             </h2>
 
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
-              {/* Error general del API */}
+              {/* Error general */}
               {errorGeneral && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-600">{errorGeneral}</p>
@@ -117,7 +117,7 @@ const Login = () => {
                   {...register('email')}
                 />
                 {errors.email && (
-                  <p className="error-msg">{errors.email.message}</p>
+                  <p className="error-msg" role="alert">{errors.email.message}</p>
                 )}
               </div>
 
@@ -142,13 +142,13 @@ const Login = () => {
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   >
                     {showPassword
-                      ? <EyeOff className="w-4 h-4" />
-                      : <Eye className="w-4 h-4" />
+                      ? <EyeOff className="w-4 h-4" aria-hidden="true" />
+                      : <Eye    className="w-4 h-4" aria-hidden="true" />
                     }
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="error-msg">{errors.password.message}</p>
+                  <p className="error-msg" role="alert">{errors.password.message}</p>
                 )}
               </div>
 
@@ -160,7 +160,7 @@ const Login = () => {
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                     Iniciando sesión...
                   </>
                 ) : (
