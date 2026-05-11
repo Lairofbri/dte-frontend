@@ -14,9 +14,14 @@ const Pagination = ({
   className = '',
 }) => {
   // Usar Number() + isInteger() — lección aprendida de CUBIC
-  const paginaActual = Number.isInteger(Number(pagina)) ? Number(pagina) : 1;
-  const limiteNum    = Number.isInteger(Number(limite))  ? Number(limite)  : 20;
-  const totalNum     = Number.isInteger(Number(total))   ? Number(total)   : 0;
+  // Validar que sean enteros POSITIVOS — 0 y negativos son inválidos
+  const paginaRaw    = Number(pagina);
+  const limiteRaw    = Number(limite);
+  const totalRaw     = Number(total);
+
+  const paginaActual = (Number.isInteger(paginaRaw) && paginaRaw >= 1) ? paginaRaw : 1;
+  const limiteNum    = (Number.isInteger(limiteRaw) && limiteRaw >= 1) ? limiteRaw : 20;
+  const totalNum     = (Number.isInteger(totalRaw)  && totalRaw  >= 0) ? totalRaw  : 0;
 
   const totalPaginas = Math.ceil(totalNum / limiteNum);
 

@@ -15,8 +15,10 @@ const Input = ({
   register,   // objeto de React Hook Form
   ...rest
 }) => {
-  const errorId  = error     ? `${id}-error`  : undefined;
-  const helperId = helperText ? `${id}-helper` : undefined;
+  const errorId = error ? `${id}-error` : undefined;
+  // helperId solo cuando el helper se renderiza — cuando hay error el helper no aparece
+  // Si referenciamos un id de un elemento que no existe aria-describedby es inválido
+  const helperId = (helperText && !error) ? `${id}-helper` : undefined;
 
   // aria-describedby une el input con su mensaje de error o ayuda
   const describedBy = [errorId, helperId].filter(Boolean).join(' ') || undefined;

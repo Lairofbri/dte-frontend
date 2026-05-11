@@ -5,7 +5,7 @@
 // → aria-modal, role="dialog", aria-labelledby
 // → Cierre al hacer click en el overlay
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useId } from 'react';
 import { X } from 'lucide-react';
 
 const TAMAÑOS = {
@@ -23,7 +23,10 @@ const Modal = ({
   size      = 'md',
   className = '',
 }) => {
-  const titleId  = 'modal-title';
+  // useId genera un ID único por instancia — evita IDs duplicados
+  // cuando hay múltiples modales en el DOM simultáneamente
+  const uid      = useId();
+  const titleId  = `modal-title-${uid}`;
   const modalRef = useRef(null);
 
   // Cerrar con Escape y bloquear scroll del body
@@ -34,15 +37,18 @@ const Modal = ({
       if (e.key === 'Escape') onClose();
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    // Guardar el overflow previo para restaurarlo al cerrar
+    // No siempre es '' — puede ser 'auto', 'scroll', etc.
+    const overflowPrevio = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    // Enfocar el modal al abrir para lectores de pantalla
+    document.addEventListener('keydown', handleKeyDown);
     modalRef.current?.focus();
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
+      // Restaurar el valor original — no asumir que era ''
+      document.body.style.overflow = overflowPrevio;
     };
   }, [isOpen, onClose]);
 
