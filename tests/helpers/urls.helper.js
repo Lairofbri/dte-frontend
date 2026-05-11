@@ -1,11 +1,12 @@
 // tests/helpers/urls.helper.js
 // Helper central para construcción de URLs en pruebas
-// Evita URLs hardcodeadas dispersas en los tests
 //
-// Al publicar el backend cambiar BASE_URL por variable de entorno:
-// export const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
+// Usa variable de entorno PLAYWRIGHT_BASE_URL si está disponible
+// → En CI: PLAYWRIGHT_BASE_URL=http://localhost:4173 (preview build)
+// → En local: http://localhost:5173 (dev server)
 
-export const BASE_URL = 'http://localhost:5173';
+export const BASE_URL =
+  process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
 
 /**
  * Construye la URL completa para una ruta del frontend

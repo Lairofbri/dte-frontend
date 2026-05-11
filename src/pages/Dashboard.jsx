@@ -82,7 +82,7 @@ const Dashboard = () => {
   const navigate     = useNavigate();
   const nombreUsuario = useAuthStore(selectNombreUsuario);
   const {
-    resumen, dtesContingencia, dtesRechazados,
+    resumen, dtesContingencia,
     isLoading, error, recargar,
   } = useDashboard();
 
