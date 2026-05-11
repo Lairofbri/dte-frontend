@@ -1,13 +1,13 @@
 // src/components/layout/AppLayout.jsx
-// Layout principal que envuelve todas las páginas protegidas
-// Sidebar + Header + contenido
+// Layout principal con sidebar colapsable
+// → Desktop: sidebar expandido/colapsado con toggle
+// → Móvil: sidebar como overlay
 
 import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header  from './Header';
 
-// Mapear rutas a títulos de página
 const titulos = {
   '/dashboard':        'Dashboard',
   '/dtes':             'Documentos Tributarios Electrónicos',
@@ -20,30 +20,29 @@ const titulos = {
 };
 
 const AppLayout = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen,      setSidebarOpen]      = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
 
-  // Obtener título de la página actual
   const titulo = titulos[location.pathname] ||
     (location.pathname.startsWith('/dtes/') ? 'Detalle DTE' : 'DTE Service');
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Sidebar */}
+      {/* Sidebar — colapsable en desktop, overlay en móvil */}
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
       />
 
-      {/* Contenido principal */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        {/* Header */}
+      {/* Contenido principal — se expande cuando el sidebar colapsa */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden transition-all duration-300">
         <Header
           onMenuClick={() => setSidebarOpen(true)}
           titulo={titulo}
         />
-
-        {/* Área de contenido con scroll */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
           <Outlet />
         </main>
