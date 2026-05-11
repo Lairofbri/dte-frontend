@@ -1,0 +1,1 @@
+const Auditoria = () => <div>Auditoria</div>; export default Auditoria;

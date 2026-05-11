@@ -1,0 +1,1 @@
+const Contingencia = () => <div>Contingencia</div>; export default Contingencia;

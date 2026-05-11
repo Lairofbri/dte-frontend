@@ -1,0 +1,1 @@
+const DTEDetalle = () => <div>DTEDetalle</div>; export default DTEDetalle;
