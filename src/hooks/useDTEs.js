@@ -17,6 +17,8 @@ export const useDTEs = () => {
   const [paginacion, setPaginacion] = useState({ total: 0, pagina: 1, limite: 20, paginas: 0 });
   const [isLoading,  setIsLoading]  = useState(true);
   const [error,      setError]      = useState(null);
+  // Contador para forzar recarga aunque los params no cambien
+  const [contadorRecarga, setContadorRecarga] = useState(0);
 
   // ── Leer filtros desde la URL — la URL ES el estado ──
   const filtros = {
@@ -65,7 +67,7 @@ export const useDTEs = () => {
 
     // Cleanup: marcar como cancelado si los params cambian antes de que termine
     return () => { cancelado = true; };
-  }, [searchParams]);
+  }, [searchParams, contadorRecarga]);
 
   // ── Actualizar filtro en la URL ──
   const cambiarFiltro = useCallback((nombre, valor) => {
@@ -96,9 +98,10 @@ export const useDTEs = () => {
   }, [setSearchParams]);
 
   // ── Recargar manualmente ──
+  // Incrementa el contador para forzar el useEffect aunque los params no cambien
   const recargar = useCallback(() => {
-    setSearchParams((prev) => new URLSearchParams(prev));
-  }, [setSearchParams]);
+    setContadorRecarga((prev) => prev + 1);
+  }, []);
 
   const hayFiltrosActivos = !!(
     filtros.tipo_dte || filtros.estado ||
