@@ -4,11 +4,14 @@
 
 import { test, expect } from '@playwright/test';
 import { CREDENCIALES, loginComoAdmin } from './helpers/auth.helper';
+import { url } from './helpers/urls.helper';
 
 test.describe('Login', () => {
+  // Este describe prueba el login — no debe usar sesión previa
+  test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:5173/login');
+    await page.goto(url('/login'));
   });
 
   // ─────────────────────────────────────────────
@@ -113,14 +116,16 @@ test.describe('Login', () => {
     await page.fill('#email',    CREDENCIALES.admin.email);
     await page.fill('#password', CREDENCIALES.admin.password);
 
-    // Click múltiples veces rápido
     const boton = page.locator('button[type="submit"]');
+
+    // Primer click — inicia la carga
     await boton.click();
 
-    // El botón debe estar deshabilitado durante la carga
+    // El botón debe deshabilitarse inmediatamente para evitar doble submit
+    // No intentamos hacer click de nuevo — ya está disabled
     await expect(boton).toBeDisabled();
 
-    // Esperar a que termine
+    // Esperar a que redirija al dashboard
     await page.waitForURL('**/dashboard');
   });
 

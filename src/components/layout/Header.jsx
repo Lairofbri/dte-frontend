@@ -35,9 +35,9 @@ const Header = ({ onMenuClick, titulo }) => {
           <Menu className="w-5 h-5" />
         </button>
         {titulo && (
-          <h1 className="text-lg font-semibold font-sans text-gray-900 hidden sm:block">
+          <h2 className="text-lg font-semibold font-sans text-gray-900 hidden sm:block">
             {titulo}
-          </h1>
+          </h2>
         )}
       </div>
 
