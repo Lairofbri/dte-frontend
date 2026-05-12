@@ -6,16 +6,7 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    body {
-    @apply bg-gray-50 text-gray-900 font-body antialiased;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-sans;
-  }
-  }
-
+  
   body {
     @apply bg-gray-50 text-gray-900 font-body antialiased;
   }
@@ -175,5 +166,15 @@
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: #CBD5E1 transparent;
+  }
+
+  /* Quitar flechitas de inputs tipo number */
+  .input-number::-webkit-outer-spin-button,
+  .input-number::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .input-number {
+    -moz-appearance: textfield;
   }
 }
