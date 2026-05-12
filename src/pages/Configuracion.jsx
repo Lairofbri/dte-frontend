@@ -134,8 +134,8 @@ const Configuracion = () => {
       }
       await actualizarConfiguracionApi(payload);
       toast.success('Configuración guardada correctamente.');
-      // Resetear isDirty sin cambiar los valores
-      reset(datos);
+      // Limpiar password después de guardar — NUNCA dejarlo visible en el formulario
+      reset({ ...datos, password_hacienda: '' });
     } catch (err) {
       const mensaje = err.response?.data?.mensaje || 'No se pudo guardar la configuración.';
       toast.error(mensaje);
