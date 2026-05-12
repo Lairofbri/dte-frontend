@@ -88,7 +88,9 @@ export const useEmitirDTE = () => {
         const descuentoPct  = Number(item.descuento_pct)   || 0;
         const subtotalItem  = cantidad * precio;
         // Convertir porcentaje a monto fijo para el backend
-        const montoDescuento = Number((subtotalItem * (descuentoPct / 100)).toFixed(2));
+        // Mismo cap que en calcularTotales — máximo 99.99%
+        const pctCapped      = Math.min(descuentoPct, 99.99);
+        const montoDescuento = Number((subtotalItem * (pctCapped / 100)).toFixed(2));
         return {
           descripcion:     item.descripcion,
           cantidad,
