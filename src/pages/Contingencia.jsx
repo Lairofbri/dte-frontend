@@ -119,9 +119,11 @@ const Contingencia = () => {
     setErrorApi('');
     try {
       // Incluir los DTEs seleccionados — si no hay selección envía todos los pendientes
-      const codigosSeleccionados = seleccionados.length > 0
-        ? dtes.filter((d) => seleccionados.includes(d.id)).map((d) => d.codigo_generacion)
-        : dtes.map((d) => d.codigo_generacion);
+      const seleccionadosEnLista = dtes.filter((d) => seleccionados.includes(d.id));
+      let codigosSeleccionados = seleccionadosEnLista.map((d) => d.codigo_generacion);
+      if (codigosSeleccionados.length === 0) {
+        codigosSeleccionados = dtes.map((d) => d.codigo_generacion);
+      }
 
       await notificarContingenciaApi({
         tipo_contingencia:   Number(datos.tipo_contingencia),
