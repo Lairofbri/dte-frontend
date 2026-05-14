@@ -12,6 +12,6 @@ export const notificarContingenciaApi = async (datos) => {
 };
 
 export const consultarLoteApi = async (codigoLote) => {
-  const { data } = await api.get(`/api/contingencia/lote/${codigoLote}`);
+  const { data } = await api.get(`/api/contingencia/lote/${encodeURIComponent(codigoLote)}`);
   return data.data;
 };

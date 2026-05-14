@@ -118,14 +118,20 @@ const Contingencia = () => {
   const onNotificar = async (datos) => {
     setErrorApi('');
     try {
+      // Incluir los DTEs seleccionados — si no hay selección envía todos los pendientes
+      const codigosSeleccionados = seleccionados.length > 0
+        ? dtes.filter((d) => seleccionados.includes(d.id)).map((d) => d.codigo_generacion)
+        : dtes.map((d) => d.codigo_generacion);
+
       await notificarContingenciaApi({
-        tipo_contingencia: Number(datos.tipo_contingencia),
-        motivo:            datos.motivo,
-        fecha_inicio:      datos.fecha_inicio,
-        hora_inicio:       datos.hora_inicio,
-        fecha_fin:         datos.fecha_fin,
-        hora_fin:          datos.hora_fin,
-        password_pri:      datos.password_pri,
+        tipo_contingencia:   Number(datos.tipo_contingencia),
+        motivo:              datos.motivo,
+        fecha_inicio:        datos.fecha_inicio,
+        hora_inicio:         datos.hora_inicio,
+        fecha_fin:           datos.fecha_fin,
+        hora_fin:            datos.hora_fin,
+        password_pri:        datos.password_pri,
+        codigos_generacion:  codigosSeleccionados,
       });
       toast.success('Evento de contingencia notificado al MH.');
       reset((v) => ({ ...v, password_pri: '' })); // limpiar passwordPri
