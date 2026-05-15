@@ -105,7 +105,9 @@ const Configuracion = () => {
             direccion:            config.direccion            ?? '',
             telefono:             config.telefono             ?? '',
             email:                config.email               ?? '',
+            correo:               config.correo              ?? '',
             codigo_actividad:     config.codigo_actividad     ?? '',
+            desc_actividad:       config.desc_actividad       ?? '',
             tipo_establecimiento: config.tipo_establecimiento ?? '02',
             usuario_hacienda:     config.usuario_hacienda ?? '',
             password_hacienda:    '',  // NUNCA pre-rellenar — el backend no lo devuelve
@@ -267,7 +269,7 @@ const Configuracion = () => {
             </div>
 
             <div>
-              <label htmlFor="email" className="label">Email</label>
+              <label htmlFor="email" className="label">Email interno</label>
               <input
                 id="email"
                 type="email"
@@ -275,6 +277,23 @@ const Configuracion = () => {
                 {...register('email')}
               />
               {errors.email && <p className="error-msg" role="alert">{errors.email.message}</p>}
+            </div>
+
+            <div>
+              <label htmlFor="correo" className="label">
+                Correo (Hacienda) <span className="text-red-500" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="correo"
+                type="email"
+                className={`input ${errors.correo ? 'input-error' : ''}`}
+                placeholder="correo@empresa.com"
+                {...register('correo')}
+              />
+              {errors.correo && <p className="error-msg" role="alert">{errors.correo.message}</p>}
+              <p className="text-xs text-gray-400 mt-1">
+                Este correo aparece en el JSON del DTE enviado a Hacienda
+              </p>
             </div>
 
             <div>
@@ -289,6 +308,23 @@ const Configuracion = () => {
                 {...register('codigo_actividad')}
               />
               {errors.codigo_actividad && <p className="error-msg" role="alert">{errors.codigo_actividad.message}</p>}
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="desc_actividad" className="label">
+                Descripción de actividad económica <span className="text-red-500" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="desc_actividad"
+                type="text"
+                placeholder="Ej: Venta al por menor de alimentos y bebidas"
+                className={`input ${errors.desc_actividad ? 'input-error' : ''}`}
+                {...register('desc_actividad')}
+              />
+              {errors.desc_actividad && <p className="error-msg" role="alert">{errors.desc_actividad.message}</p>}
+              <p className="text-xs text-gray-400 mt-1">
+                Aparece como descActividad en el emisor del JSON de Hacienda
+              </p>
             </div>
 
             <div>
