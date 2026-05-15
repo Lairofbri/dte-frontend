@@ -15,6 +15,7 @@ import DTEEmitir       from '../pages/DTEs/DTEEmitir';
 import Configuracion   from '../pages/Configuracion';
 import Establecimientos from '../pages/Establecimientos';
 import Usuarios        from '../pages/Usuarios';
+import Clientes        from '../pages/Clientes';
 import Contingencia    from '../pages/Contingencia';
 import Auditoria       from '../pages/Auditoria';
 import NotFound        from '../pages/NotFound';
@@ -61,6 +62,10 @@ const router = createBrowserRouter([
       {
         path:    'usuarios',
         element: <AdminRoute><Usuarios /></AdminRoute>,
+      },
+      {
+        path:    'clientes',
+        element: <Clientes />,
       },
       {
         path:    'auditoria',

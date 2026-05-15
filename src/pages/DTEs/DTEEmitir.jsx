@@ -12,6 +12,7 @@ import {
   Eye, EyeOff, Loader2, Lock,
 } from 'lucide-react';
 import { useEmitirDTE, calcularTotales } from '../../hooks/useEmitirDTE';
+import SelectorCliente from '../../components/clientes/SelectorCliente';
 import { formatMonto }            from '../../utils/formatters';
 
 // ─────────────────────────────────────────────
@@ -204,8 +205,9 @@ const DTEEmitir = () => {
   const [tipoDte,   setTipoDte]       = useState('01');
   const [condicion, setCondicion]     = useState(1);
   const [errorApi,  setErrorApi]      = useState('');
+  const [clienteId, setClienteId]     = useState(null);
 
-  const { register, control, handleSubmit, watch, reset,
+  const { register, control, handleSubmit, watch, reset, setValue,
     formState: { errors } } = useForm({
     resolver: zodResolver(getSchema(tipoDte)),
     defaultValues: {
@@ -285,6 +287,7 @@ const DTEEmitir = () => {
         condicionOperacion:  condicion,
         extension,
         passwordPri:         datos.password_pri,
+        clienteId,
       });
     } catch (_) {
       const msg = _.response?.data?.mensaje || 'No se pudo emitir el DTE.';
@@ -357,7 +360,49 @@ const DTEEmitir = () => {
           </div>
           <div className="card-body space-y-4">
 
-            {/* Campos comunes */}
+            {/* Buscador de clientes — autocomplete */}
+            <div className="mb-4">
+              <label className="label mb-1.5">
+                Buscar cliente guardado
+              </label>
+              <SelectorCliente
+                tipoDte={tipoDte}
+                valorActual=""
+                onSeleccionar={(receptor, id) => {
+                  setClienteId(id || null);
+                  if (!receptor) return;
+                  // Llenar campos del formulario según tipo DTE
+                  if (tipoDte === '01') {
+                    if (receptor.nombre)        setValue('rec_nombre',   receptor.nombre);
+                    if (receptor.tipo_documento) setValue('rec_tipo_doc', receptor.tipo_documento);
+                    if (receptor.num_documento)  setValue('rec_num_doc',  receptor.num_documento);
+                    if (receptor.correo)         setValue('rec_correo',   receptor.correo);
+                    if (receptor.telefono)       setValue('rec_telefono', receptor.telefono);
+                  } else if (tipoDte === '03') {
+                    if (receptor.nombre)          setValue('rec_nombre',         receptor.nombre);
+                    if (receptor.nit)             setValue('rec_nit',            receptor.nit);
+                    if (receptor.nrc)             setValue('rec_nrc',            receptor.nrc);
+                    if (receptor.cod_actividad)   setValue('rec_cod_actividad',  receptor.cod_actividad);
+                    if (receptor.desc_actividad)  setValue('rec_desc_actividad', receptor.desc_actividad);
+                    if (receptor.correo)          setValue('rec_correo',         receptor.correo);
+                    if (receptor.telefono)        setValue('rec_telefono',       receptor.telefono);
+                    if (receptor.departamento_cod) setValue('rec_depto',         receptor.departamento_cod);
+                    if (receptor.municipio_cod)   setValue('rec_municipio',      receptor.municipio_cod);
+                  } else if (tipoDte === '14') {
+                    if (receptor.nombre)   setValue('rec_nombre',   receptor.nombre);
+                    if (receptor.nit)      setValue('rec_nit',      receptor.nit);
+                    if (receptor.correo)   setValue('rec_correo',   receptor.correo);
+                    if (receptor.telefono) setValue('rec_telefono', receptor.telefono);
+                  }
+                }}
+              />
+              <p className="text-xs text-gray-400 mt-1.5">
+                O llena los campos manualmente
+              </p>
+            </div>
+            <div className="border-t border-gray-100 pt-4" />
+
+            {/* Campos manuales */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
                 <Field label="Nombre / razón social" req={esCCF || esFSE}
