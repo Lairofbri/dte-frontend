@@ -36,3 +36,10 @@ tests/.auth/
 #AGENTS
 AGENTS.md
 AGENTS-FRONTEND.md
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
