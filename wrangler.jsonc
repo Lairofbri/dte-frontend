@@ -8,6 +8,9 @@
   "assets": {
     "not_found_handling": "single-page-application"
   },
+  "vars": {
+    "VITE_API_URL": "https://dte-service-production.up.railway.app"
+  },
   "compatibility_flags": [
     "nodejs_compat"
   ]
