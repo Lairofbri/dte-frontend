@@ -69,7 +69,6 @@ const Contingencia = () => {
   const [isLoading,       setIsLoading]       = useState(true);
   const [error,           setError]           = useState(null);
   const [seleccionados,   setSeleccionados]   = useState([]);
-  const [enviandoLote,    setEnviandoLote]    = useState(false);
   const [showPassword,    setShowPassword]    = useState(false);
   const [errorApi,        setErrorApi]        = useState('');
   const [contadorRecarga, setContadorRecarga] = useState(0);

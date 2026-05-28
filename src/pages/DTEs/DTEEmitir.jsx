@@ -1,6 +1,6 @@
 // src/pages/DTEs/DTEEmitir.jsx
-// Formulario completo para emitir FCF, CCF y FSE
-// Campos según estructura oficial Hacienda El Salvador
+// Formulario completo para emitir FCF, CCF, FSE, NC y ND
+// Campos según estructura oficial Hacienda El Salvador v2/v3/v4
 
 import { useState }               from 'react';
 import { useNavigate }            from 'react-router-dom';
@@ -32,6 +32,11 @@ const FORMAS_PAGO = [
   { value: '04', label: 'Cheque (04)' },
   { value: '05', label: 'Transferencia (05)' },
   { value: '08', label: 'Dinero electrónico (08)' },
+  { value: '09', label: 'Monedero electrónico (09)' },
+  { value: '11', label: 'Bitcoin (11)' },
+  { value: '12', label: 'Otras criptomonedas (12)' },
+  { value: '13', label: 'Cuentas por pagar del receptor (13)' },
+  { value: '14', label: 'Giro bancario (14)' },
   { value: '99', label: 'Otros (99)' },
 ];
 
@@ -125,7 +130,7 @@ const pagoSchema = z.object({
 });
 
 const schemaBase = z.object({
-  tipo_dte:            z.enum(['01', '03', '14']),
+  tipo_dte:            z.enum(['01', '03', '14', '05', '06']),
   condicion_operacion: z.coerce.number().int().min(1).max(3).default(1),
   items:               z.array(itemSchema).min(1, 'Agrega al menos un ítem.'),
   pagos:               z.array(pagoSchema).min(1, 'Agrega al menos una forma de pago.'),
@@ -162,14 +167,43 @@ const schemaFSE = schemaBase.extend({
   rec_nit:      z.string().regex(/^\d{4}-\d{6}-\d{3}-\d$/, 'Formato: 0000-000000-000-0'),
   rec_correo:   z.string().email('Email inválido.').optional().or(z.literal('')),
   rec_telefono: z.string().optional().or(z.literal('')),
+  observaciones: z.string().max(3000, 'Máximo 3000 caracteres.').optional().or(z.literal('')),
 });
 
-const getSchema = (t) => t === '03' ? schemaCCF : t === '14' ? schemaFSE : schemaFCF;
+// NC/ND: mismo receptor que CCF + documento_relacionado requerido
+const schemaNCND = schemaBase.extend({
+  rec_nombre:        z.string().min(1, 'Nombre del receptor requerido.'),
+  rec_nit:           z.string().regex(/^\d{4}-\d{6}-\d{3}-\d$/, 'Formato: 0000-000000-000-0'),
+  rec_nrc:           z.string().optional().or(z.literal('')),
+  rec_cod_actividad: z.string().optional().or(z.literal('')),
+  rec_desc_actividad: z.string().optional().or(z.literal('')),
+  rec_correo:        z.string().email('Email inválido.').optional().or(z.literal('')),
+  rec_telefono:      z.string().optional().or(z.literal('')),
+  rec_depto:         z.string().optional(),
+  rec_municipio:     z.string().optional(),
+  doc_rel_codgen:    z.string().min(1, 'Selecciona el DTE relacionado.'),
+  doc_rel_tipo:      z.string().min(1, 'Tipo de DTE requerido.'),
+  doc_rel_fecha:     z.string().min(1, 'Fecha de emisión requerida.'),
+  fusion:            z.string().optional().or(z.literal('')),
+  observaciones:     z.string().max(3000, 'Máximo 3000 caracteres.').optional().or(z.literal('')),
+}).refine((d) => {
+  if (!d.doc_rel_fecha) return true;
+  if (isNaN(Date.parse(d.doc_rel_fecha))) return false;
+  const fecha = new Date(d.doc_rel_fecha);
+  return fecha <= new Date();
+}, { message: 'La fecha no puede ser futura.', path: ['doc_rel_fecha'] });
+
+const getSchema = (t) => {
+  if (t === '03')               return schemaCCF;
+  if (t === '14')               return schemaFSE;
+  if (t === '05' || t === '06') return schemaNCND;
+  return schemaFCF;
+};
 
 const ITEM_VACIO = {
   descripcion: '', tipo_item: 2, uni_medida: 59,
   cantidad: 1, precio_unitario: 0,
-  descuento_pct: 0, venta_no_suj: 0, venta_exenta: 0,
+  descuento_pct: 0, venta_no_suj: 0, venta_exenta: 0, compra: 0,
 };
 
 const PAGO_VACIO = { codigo: '01', montoPago: 0, referencia: '', plazo: null, periodo: null };
@@ -228,6 +262,9 @@ const DTEEmitir = () => {
   const totales       = calcularTotales(itemsActuales, tipoDte);
   const esCCF         = tipoDte === '03';
   const esFSE         = tipoDte === '14';
+  const esNC          = tipoDte === '05';
+  const esND          = tipoDte === '06';
+  const esNCND        = esNC || esND;
 
   const cambiarTipo = (t) => {
     setTipoDte(t);
@@ -248,7 +285,7 @@ const DTEEmitir = () => {
           correo:        datos.rec_correo    || null,
           telefono:      datos.rec_telefono  || null,
         };
-      } else if (tipoDte === '03') {
+      } else if (tipoDte === '03' || esNCND) {
         receptor = {
           nit:            datos.rec_nit,
           nrc:            datos.rec_nrc            || null,
@@ -279,6 +316,13 @@ const DTEEmitir = () => {
         observaciones: datos.ext_observaciones || null,
       } : null;
 
+      // Documento relacionado (NC/ND)
+      const documentoRelacionado = esNCND ? {
+        codigo_generacion: datos.doc_rel_codgen,
+        tipo_dte:          datos.doc_rel_tipo,
+        fecha_emision:     datos.doc_rel_fecha,
+      } : null;
+
       await emitir({
         tipoDte,
         receptor,
@@ -288,6 +332,9 @@ const DTEEmitir = () => {
         extension,
         passwordPri:         datos.password_pri,
         clienteId,
+        documentoRelacionado,
+        fusion:              datos.fusion || null,
+        observaciones:       datos.observaciones || null,
       });
     } catch (_) {
       const msg = _.response?.data?.mensaje || 'No se pudo emitir el DTE.';
@@ -333,6 +380,8 @@ const DTEEmitir = () => {
               {[
                 { v: '01', l: 'FCF — Factura consumidor final' },
                 { v: '03', l: 'CCF — Crédito fiscal' },
+                { v: '05', l: 'NC — Nota de crédito' },
+                { v: '06', l: 'ND — Nota de débito' },
                 { v: '14', l: 'FSE — Sujeto excluido' },
               ].map(({ v, l }) => (
                 <button key={v} type="button" onClick={() => cambiarTipo(v)}
@@ -355,6 +404,11 @@ const DTEEmitir = () => {
             {tipoDte === '01' && (
               <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
                 opcional &lt; $1,095 en FCF
+              </span>
+            )}
+            {esNCND && (
+              <span className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">
+                requiere DTE relacionado
               </span>
             )}
           </div>
@@ -393,6 +447,17 @@ const DTEEmitir = () => {
                     if (receptor.nit)      setValue('rec_nit',      receptor.nit);
                     if (receptor.correo)   setValue('rec_correo',   receptor.correo);
                     if (receptor.telefono) setValue('rec_telefono', receptor.telefono);
+                  } else if (esNCND) {
+                    // NC/ND: mismo receptor que CCF
+                    if (receptor.nombre)          setValue('rec_nombre',         receptor.nombre);
+                    if (receptor.nit)             setValue('rec_nit',            receptor.nit);
+                    if (receptor.nrc)             setValue('rec_nrc',            receptor.nrc);
+                    if (receptor.cod_actividad)   setValue('rec_cod_actividad',  receptor.cod_actividad);
+                    if (receptor.desc_actividad)  setValue('rec_desc_actividad', receptor.desc_actividad);
+                    if (receptor.correo)          setValue('rec_correo',         receptor.correo);
+                    if (receptor.telefono)        setValue('rec_telefono',       receptor.telefono);
+                    if (receptor.departamento_cod) setValue('rec_depto',         receptor.departamento_cod);
+                    if (receptor.municipio_cod)   setValue('rec_municipio',      receptor.municipio_cod);
                   }
                 }}
               />
@@ -405,7 +470,7 @@ const DTEEmitir = () => {
             {/* Campos manuales */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
-                <Field label="Nombre / razón social" req={esCCF || esFSE}
+                <Field label="Nombre / razón social" req={esCCF || esFSE || esNCND}
                   error={errors.rec_nombre?.message}>
                   <input type="text" className={`input ${errors.rec_nombre ? 'input-error' : ''}`}
                     placeholder="Nombre completo o razón social"
@@ -414,7 +479,7 @@ const DTEEmitir = () => {
               </div>
 
               {/* FCF: tipo doc + num doc */}
-              {!esCCF && !esFSE && (
+              {!esCCF && !esFSE && !esNCND && (
                 <>
                   <Field label="Tipo de documento">
                     <select className="input" {...register('rec_tipo_doc')}>
@@ -428,16 +493,16 @@ const DTEEmitir = () => {
                 </>
               )}
 
-              {/* CCF: NIT */}
-              {(esCCF || esFSE) && (
+              {/* CCF, FSE, NC, ND: NIT */}
+              {(esCCF || esFSE || esNCND) && (
                 <Field label="NIT" req error={errors.rec_nit?.message}>
                   <input type="text" className={`input font-mono ${errors.rec_nit ? 'input-error' : ''}`}
                     placeholder="0000-000000-000-0" {...register('rec_nit')} />
                 </Field>
               )}
 
-              {/* CCF: NRC */}
-              {esCCF && (
+              {/* CCF + NC/ND: NRC */}
+              {(esCCF || esNCND) && (
                 <Field label="NRC" error={errors.rec_nrc?.message}>
                   <input type="text" className="input font-mono"
                     placeholder="000000-0" {...register('rec_nrc')} />
@@ -455,43 +520,109 @@ const DTEEmitir = () => {
               </Field>
             </div>
 
-            {/* Campos exclusivos CCF */}
+            {/* Campos exclusivos CCF + NC/ND */}
             <div>
               <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
-                Datos adicionales — requeridos en CCF
+                Datos adicionales — requeridos en CCF / NC / ND
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Código de actividad económica">
                   <input type="text" className="input font-mono"
-                    placeholder="00000" disabled={!esCCF}
+                    placeholder="00000" disabled={!esCCF && !esNCND}
                     {...register('rec_cod_actividad')} />
-                  {!esCCF && <DisabledNote msg="solo CCF" />}
+                  {!esCCF && !esNCND && <DisabledNote msg="solo CCF / NC / ND" />}
                 </Field>
                 <Field label="Descripción de actividad">
                   <input type="text" className="input"
-                    placeholder="Ej: Venta al por menor..." disabled={!esCCF}
+                    placeholder="Ej: Venta al por menor..." disabled={!esCCF && !esNCND}
                     {...register('rec_desc_actividad')} />
-                  {!esCCF && <DisabledNote msg="solo CCF" />}
+                  {!esCCF && !esNCND && <DisabledNote msg="solo CCF / NC / ND" />}
                 </Field>
                 <Field label="Departamento">
-                  <select className="input" disabled={!esCCF} {...register('rec_depto')}>
+                  <select className="input" disabled={!esCCF && !esNCND} {...register('rec_depto')}>
                     <option value="">Seleccionar...</option>
                     {DEPARTAMENTOS.map(d => (
                       <option key={d.cod} value={d.cod}>{d.nombre || d.label}</option>
                     ))}
                   </select>
-                  {!esCCF && <DisabledNote msg="solo CCF" />}
+                  {!esCCF && !esNCND && <DisabledNote msg="solo CCF / NC / ND" />}
                 </Field>
                 <Field label="Distrito (municipio — CAT-013)">
                   <input type="text" className="input font-mono"
                     placeholder="Ej: 23 = San Salvador Centro"
-                    disabled={!esCCF} {...register('rec_municipio')} />
-                  {!esCCF && <DisabledNote msg="solo CCF" />}
+                    disabled={!esCCF && !esNCND} {...register('rec_municipio')} />
+                  {!esCCF && !esNCND && <DisabledNote msg="solo CCF / NC / ND" />}
                 </Field>
               </div>
             </div>
           </div>
         </div>
+
+        {/* 2b. Documento relacionado — NC / ND */}
+        {esNCND && (
+          <div className="card">
+            <div className="card-header">
+              <h2 className="font-semibold text-gray-800 font-sans">Documento relacionado</h2>
+              <span className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
+                requerido
+              </span>
+            </div>
+            <div className="card-body">
+              <p className="text-xs text-gray-400 mb-4">
+                Ingresa los datos del DTE original al que aplica esta {tipoDte === '05' ? 'nota de crédito' : 'nota de débito'}.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Field label="Código de generación" req error={errors.doc_rel_codgen?.message}>
+                  <input type="text" className={`input font-mono text-sm ${errors.doc_rel_codgen ? 'input-error' : ''}`}
+                    placeholder="UUID del DTE original"
+                    {...register('doc_rel_codgen')} />
+                </Field>
+                <Field label="Tipo DTE original" req error={errors.doc_rel_tipo?.message}>
+                  <select className={`input ${errors.doc_rel_tipo ? 'input-error' : ''}`}
+                    {...register('doc_rel_tipo')}>
+                    <option value="">Seleccionar...</option>
+                    <option value="01">FCF (01)</option>
+                    <option value="03">CCF (03)</option>
+                    <option value="04">Nota de Remisión (04)</option>
+                    <option value="05">Nota de Crédito (05)</option>
+                    <option value="06">Nota de Débito (06)</option>
+                  </select>
+                </Field>
+                <Field label="Fecha de emisión" req error={errors.doc_rel_fecha?.message}>
+                  <input type="date"
+                    className={`input ${errors.doc_rel_fecha ? 'input-error' : ''}`}
+                    {...register('doc_rel_fecha')} />
+                </Field>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2c. Datos adicionales — NC/ND + FSE */}
+        {(esNCND || esFSE) && (
+          <div className="card">
+            <div className="card-header">
+              <h2 className="font-semibold text-gray-800 font-sans">Datos adicionales</h2>
+            </div>
+            <div className="card-body space-y-3">
+              {esNCND && (
+                <Field label="Fusión (NIT)" note="Solo si aplica fusión empresarial — opcional">
+                  <input type="text" className="input font-mono"
+                    placeholder="0000-000000-000-0"
+                    {...register('fusion')} />
+                </Field>
+              )}
+              <Field label="Observaciones" note={`Máximo 3000 caracteres — ${esNCND ? 'requerido por Hacienda en NC/ND' : 'opcional en FSE'}`}>
+                <textarea rows={2} className="input resize-none"
+                  placeholder={esNCND ? 'Motivo de la nota...' : 'Observaciones adicionales...'}
+                  {...register('observaciones')} />
+                {errors.observaciones && (
+                  <p className="error-msg" role="alert">{errors.observaciones.message}</p>
+                )}
+              </Field>
+            </div>
+          </div>
+        )}
 
         {/* 3. Ítems */}
         <div className="card">
@@ -506,15 +637,26 @@ const DTEEmitir = () => {
           <div className="card-body">
             {/* Cabecera tabla */}
             <div className="hidden lg:grid gap-2 pb-2 border-b border-gray-100 mb-3"
-              style={{gridTemplateColumns:'2fr .6fr .55fr .65fr .6fr .6fr .6fr .38fr'}}>
-              {['Descripción','Tipo','Cant.','Precio','Desc.%','No suj.','Exenta',''].map((h, i) => (
-                <span key={i} className={`text-xs text-gray-400 font-medium uppercase tracking-wide ${i>1?'text-right':''}`}>{h}</span>
-              ))}
+              style={{gridTemplateColumns: esFSE
+                ? '2fr .6fr .55fr .65fr .6fr .7fr .38fr'
+                : '2fr .6fr .55fr .65fr .6fr .6fr .6fr .38fr'
+              }}>
+              {esFSE
+                ? ['Descripción','Tipo','Cant.','Precio','Desc.%','Compra',''].map((h, i) => (
+                  <span key={i} className={`text-xs text-gray-400 font-medium uppercase tracking-wide ${i>1?'text-right':''}`}>{h}</span>
+                ))
+                : ['Descripción','Tipo','Cant.','Precio','Desc.%','No suj.','Exenta',''].map((h, i) => (
+                  <span key={i} className={`text-xs text-gray-400 font-medium uppercase tracking-wide ${i>1?'text-right':''}`}>{h}</span>
+                ))
+              }
             </div>
 
             {itemFields.map((field, idx) => (
               <div key={field.id} className="lg:grid gap-2 mb-3 pb-3 border-b border-gray-50 last:border-0 last:mb-0 last:pb-0 space-y-2 lg:space-y-0 items-center"
-                style={{gridTemplateColumns:'2fr .6fr .55fr .65fr .6fr .6fr .6fr .38fr'}}>
+                style={{gridTemplateColumns: esFSE
+                  ? '2fr .6fr .55fr .65fr .6fr .7fr .38fr'
+                  : '2fr .6fr .55fr .65fr .6fr .6fr .6fr .38fr'
+                }}>
 
                 {/* Descripción */}
                 <div>
@@ -564,25 +706,35 @@ const DTEEmitir = () => {
                   )}
                 </div>
 
-                {/* Venta no sujeta */}
-                <div>
-                  <label className="label lg:hidden">No suj. ($)</label>
-                  <input type="number" min="0" step="0.01" placeholder="0.00"
-                    className="input input-number text-sm text-right"
-                    disabled={esFSE}
-                    {...register(`items.${idx}.venta_no_suj`)} />
-                  {esFSE && <DisabledNote msg="no aplica FSE" />}
-                </div>
+                {/* Venta no sujeta — no aplica FSE */}
+                {!esFSE && (
+                  <div>
+                    <label className="label lg:hidden">No suj. ($)</label>
+                    <input type="number" min="0" step="0.01" placeholder="0.00"
+                      className="input input-number text-sm text-right"
+                      {...register(`items.${idx}.venta_no_suj`)} />
+                  </div>
+                )}
 
-                {/* Venta exenta */}
-                <div>
-                  <label className="label lg:hidden">Exenta ($)</label>
-                  <input type="number" min="0" step="0.01" placeholder="0.00"
-                    className="input input-number text-sm text-right"
-                    disabled={esFSE}
-                    {...register(`items.${idx}.venta_exenta`)} />
-                  {esFSE && <DisabledNote msg="no aplica FSE" />}
-                </div>
+                {/* Venta exenta — no aplica FSE */}
+                {!esFSE && (
+                  <div>
+                    <label className="label lg:hidden">Exenta ($)</label>
+                    <input type="number" min="0" step="0.01" placeholder="0.00"
+                      className="input input-number text-sm text-right"
+                      {...register(`items.${idx}.venta_exenta`)} />
+                  </div>
+                )}
+
+                {/* Compra — solo FSE */}
+                {esFSE && (
+                  <div>
+                    <label className="label lg:hidden">Compra ($)</label>
+                    <input type="number" min="0" step="0.01" placeholder="0.00"
+                      className="input input-number text-sm text-right"
+                      {...register(`items.${idx}.compra`)} />
+                  </div>
+                )}
 
                 {/* Eliminar */}
                 <button type="button"
@@ -597,6 +749,35 @@ const DTEEmitir = () => {
 
             {/* Resumen desglosado completo */}
             <div className="bg-gray-50 rounded-lg p-4 mt-4 space-y-1.5">
+              {esFSE ? (
+                <>
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>Total compra</span>
+                    <span className="font-mono">{formatMonto(totales.totalCompra)}</span>
+                  </div>
+                  {totales.descuGravada > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Descuento</span>
+                      <span className="font-mono">−{formatMonto(totales.descuGravada)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>Subtotal</span>
+                    <span className="font-mono">{formatMonto(totales.subTotalFSE)}</span>
+                  </div>
+                  {totales.reteRenta > 0 && (
+                    <div className="flex justify-between text-sm text-orange-600">
+                      <span>Retención Renta</span>
+                      <span className="font-mono">{formatMonto(totales.reteRenta)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-base font-semibold text-gray-900 pt-2 border-t border-gray-200">
+                    <span>Total a pagar</span>
+                    <span className="font-mono">{formatMonto(totales.totalPagar)}</span>
+                  </div>
+                </>
+              ) : (
+                <>
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Total no sujeto</span>
                 <span className="font-mono">{formatMonto(totales.totalNoSuj)}</span>
@@ -623,9 +804,15 @@ const DTEEmitir = () => {
                 <span>Subtotal</span>
                 <span className="font-mono">{formatMonto(totales.subTotal)}</span>
               </div>
-              {tipoDte !== '14' && (
+              {(tipoDte === '03' || esNCND) && (
                 <div className="flex justify-between text-sm text-gray-500">
                   <span>IVA 13% (tributo 20)</span>
+                  <span className="font-mono">{formatMonto(totales.ivaValor)}</span>
+                </div>
+              )}
+              {tipoDte === '01' && (
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>IVA 13% (incluido)</span>
                   <span className="font-mono">{formatMonto(totales.ivaValor)}</span>
                 </div>
               )}
@@ -638,6 +825,8 @@ const DTEEmitir = () => {
                   {numeroALetras(totales.totalPagar)}
                 </p>
               )}
+                </>
+              ) }
             </div>
           </div>
         </div>

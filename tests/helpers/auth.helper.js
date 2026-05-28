@@ -23,4 +23,5 @@ export const loginComoAdmin = async (page) => {
   await page.fill('#email',    CREDENCIALES.admin.email);
   await page.fill('#password', CREDENCIALES.admin.password);
   await page.click('button[type="submit"]');
-  // Esperar dashboard con matcher agnóstico al host/puerto
+  await page.waitForURL(`${BASE_URL}/dashboard`);
+};
