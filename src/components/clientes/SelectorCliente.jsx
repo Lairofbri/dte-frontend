@@ -14,6 +14,7 @@ import { toast } from 'react-hot-toast';
 const getTipoSugerido = (tipoDte) => {
   if (tipoDte === '03') return 'juridico'; // CCF → jurídico
   if (tipoDte === '14') return 'juridico'; // FSE → jurídico
+  if (tipoDte === '05' || tipoDte === '06') return 'juridico'; // NC/ND → jurídico
   return '';                               // FCF → cualquiera
 };
 
@@ -88,7 +89,8 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
         correo:        cliente.correo          || null,
         telefono:      cliente.telefono        || null,
       };
-    } else if (tipoDte === '03') {
+    } else if (tipoDte === '03' || tipoDte === '05' || tipoDte === '06') {
+      // CCF + NC + ND — mismo receptor
       receptor = {
         nit:            cliente.nit,
         nrc:            cliente.nrc            || null,
@@ -169,6 +171,7 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
           placeholder={
             tipoDte === '03' ? 'Buscar empresa (NIT, NRC, nombre)...' :
             tipoDte === '14' ? 'Buscar sujeto excluido (NIT, nombre)...' :
+            (tipoDte === '05' || tipoDte === '06') ? 'Buscar empresa (NIT, NRC, nombre)...' :
             'Buscar cliente (nombre, DUI, NIT)...'
           }
           className={`input pl-9 pr-16 ${clienteSelec ? 'bg-green-50 border-green-300' : ''}`}

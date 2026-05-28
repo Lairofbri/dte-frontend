@@ -14,7 +14,6 @@ import Button                   from '../../components/ui/Button';
 import {
   formatMonto,
   formatFecha,
-  acortarCodigo,
   nombreTipoDTE,
 } from '../../utils/formatters';
 

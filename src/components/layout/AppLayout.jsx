@@ -13,6 +13,7 @@ const titulos = {
   '/dtes':             'Documentos Tributarios Electrónicos',
   '/dtes/emitir':      'Emitir DTE',
   '/contingencia':     'Contingencia',
+  '/clientes':         'Clientes',
   '/configuracion':    'Configuración',
   '/establecimientos': 'Establecimientos',
   '/usuarios':         'Usuarios',
@@ -25,7 +26,7 @@ const AppLayout = () => {
   const location = useLocation();
 
   const titulo = titulos[location.pathname] ||
-    (location.pathname.startsWith('/dtes/') ? 'Detalle DTE' : 'DTE Service');
+    (location.pathname.startsWith('/dtes/') ? 'Detalle DTE' : 'DTE Flash');
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">

@@ -1,5 +1,5 @@
 // src/pages/Login.jsx
-// Página de login del DTE Service
+// Página de login de DTE Flash
 //
 // SEGURIDAD:
 // → Mensaje de error fijo — no revelar si el email existe
@@ -15,7 +15,7 @@ import { Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Zap, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, ReceiptText, Loader2 } from 'lucide-react';
 import { useAuthStore, selectIsAuthenticated } from '../store/auth.store';
 import { useAuth } from '../hooks/useAuth';
 
@@ -77,11 +77,11 @@ const Login = () => {
 
         {/* Logo y título */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-primary-600 rounded-2xl mb-4 shadow-lg">
-            <Zap className="w-7 h-7 text-white" />
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl mb-4 shadow-lg shadow-primary-900/20">
+            <ReceiptText className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold font-sans text-gray-900">
-            DTE Service
+            DTE Flash
           </h1>
           <p className="text-gray-500 text-sm mt-1">
             Facturación Electrónica El Salvador
@@ -173,7 +173,7 @@ const Login = () => {
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-400 mt-6">
-          DTE Service © {new Date().getFullYear()} — El Salvador
+           DTE Flash © {new Date().getFullYear()} — El Salvador
         </p>
       </div>
     </div>

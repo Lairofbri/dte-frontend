@@ -141,11 +141,18 @@
 
   /* ── Sidebar ── */
   .sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-text hover:bg-sidebar-hover hover:text-white transition-all duration-150;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-text hover:bg-sidebar-hover hover:text-white transition-all duration-150 select-none;
   }
 
   .sidebar-link.active {
     @apply bg-sidebar-active text-white;
+    box-shadow: inset 3px 0 0 theme('colors.primary.400');
+  }
+
+  /* Animación de submenú (grid-template-rows) */
+  .submenu-collapse {
+    @apply grid;
+    transition: grid-template-rows 200ms ease;
   }
 
   /* ── Page header ── */

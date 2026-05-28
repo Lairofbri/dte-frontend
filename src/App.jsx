@@ -10,7 +10,7 @@ import { refreshApi, meApi } from './api/auth.api';
 import { useAuthStore } from './store/auth.store';
 
 const App = () => {
-  const { setAuth, logout, setLoading, setAccessToken } = useAuthStore();
+  const { setAuth, logout, setAccessToken } = useAuthStore();
 
   useEffect(() => {
     const verificarSesion = async () => {
