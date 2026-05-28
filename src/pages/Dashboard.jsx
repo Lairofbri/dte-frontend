@@ -16,7 +16,7 @@ import { useAuthStore, selectNombreUsuario } from '../store/auth.store';
 import Badge               from '../components/ui/Badge';
 import Spinner             from '../components/ui/Spinner';
 import Button              from '../components/ui/Button';
-import { formatMonto, formatFechaHora, nombreTipoDTE } from '../utils/formatters';
+import { formatFechaHora, nombreTipoDTE } from '../utils/formatters';
 
 // ─────────────────────────────────────────────
 // SUBCOMPONENTES

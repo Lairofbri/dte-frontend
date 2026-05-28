@@ -48,20 +48,20 @@ export const useDTEDetalle = (codigoGeneracion) => {
   }, []);
 
   // ── Anular DTE ──
-  const anular = useCallback(async ({ passwordPri, motivoAnulacion }) => {
+  const anular = useCallback(async (payload) => {
     if (!dte) return;
     setAnulando(true);
     try {
       await anularDTEApi({
         codigo_generacion: dte.codigo_generacion,
-        password_pri:      passwordPri,
-        motivo_anulacion:  motivoAnulacion,
+        ...payload,
       });
       toast.success('DTE anulado correctamente.');
       navigate('/dtes');
     } catch (err) {
       const mensaje = err.response?.data?.mensaje || 'No se pudo anular el DTE.';
       toast.error(mensaje);
+      throw err;
     } finally {
       setAnulando(false);
     }
