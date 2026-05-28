@@ -115,6 +115,7 @@ const itemSchema = z.object({
   descuento_pct:   z.coerce.number().min(0).max(99.99).default(0),
   venta_no_suj:    z.coerce.number().min(0).default(0),
   venta_exenta:    z.coerce.number().min(0).default(0),
+  compra:          z.coerce.number().min(0).default(0),
 }).refine((item) => {
   const sub = item.cantidad * item.precio_unitario;
   const desc = sub * (item.descuento_pct / 100);

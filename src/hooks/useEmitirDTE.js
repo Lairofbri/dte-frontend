@@ -88,7 +88,7 @@ const calcularTotalesFSE = (items = []) => {
     const precio   = Number(item.precio_unitario) || 0;
     const pct      = Math.min(Number(item.descuento_pct) || 0, 99.99);
 
-    const compraItem     = cantidad * precio;
+    const compraItem     = Number(item.compra) || (cantidad * precio);
     const montoDescuento = compraItem * (pct / 100);
 
     totalCompra += compraItem;
@@ -154,7 +154,7 @@ export const useEmitirDTE = () => {
 
       // FSE: campo compra en vez de venta_gravada/venta_no_suj/venta_exenta
       if (esFSE) {
-        mapped.compra = Math.round((cantidad * precio - descuento) * 100) / 100;
+        mapped.compra = Number(item.compra) || 0;
       } else {
         mapped.venta_no_suj = Number(item.venta_no_suj) || 0;
         mapped.venta_exenta = Number(item.venta_exenta) || 0;
