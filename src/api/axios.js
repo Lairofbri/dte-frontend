@@ -12,7 +12,7 @@ import axios from 'axios';
 // Import estático — require() no existe en ESM/Vite
 import { useAuthStore } from '../store/auth.store';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 // ─────────────────────────────────────────────
 // Instancia base

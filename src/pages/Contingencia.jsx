@@ -14,11 +14,13 @@ import { toast }         from 'react-hot-toast';
 import {
   AlertTriangle, Send, RefreshCw,
   CheckSquare, Square, Eye, EyeOff, Loader2,
+  ChevronDown, ChevronRight,
 } from 'lucide-react';
 import {
   listarContingenciaApi,
   notificarContingenciaApi,
 } from '../api/contingencia.api';
+import { obtenerConfiguracionApi } from '../api/configuracion.api';
 import Badge              from '../components/ui/Badge';
 import Spinner            from '../components/ui/Spinner';
 import Button             from '../components/ui/Button';
@@ -36,16 +38,32 @@ const TIPOS_CONTINGENCIA = [
 ];
 
 // ─────────────────────────────────────────────
+// TIPOS DE DOCUMENTO DEL RESPONSABLE (CAT MH)
+// ─────────────────────────────────────────────
+const TIPO_DOC_RESPONSABLE = [
+  { value: '13', label: 'DUI' },
+  { value: '36', label: 'NIT' },
+  { value: '03', label: 'Pasaporte' },
+  { value: '02', label: 'Carné de Residente' },
+  { value: '37', label: 'Otro' },
+];
+
+// ─────────────────────────────────────────────
 // SCHEMA DE NOTIFICACIÓN
 // ─────────────────────────────────────────────
 const schemaNotificar = z.object({
-  tipo_contingencia: z.coerce.number().min(1).max(5),
-  motivo:            z.string().min(5, 'Mínimo 5 caracteres.'),
-  fecha_inicio:      z.string().min(1, 'La fecha de inicio es requerida.'),
-  hora_inicio:       z.string().min(1, 'La hora de inicio es requerida.'),
-  fecha_fin:         z.string().min(1, 'La fecha de fin es requerida.'),
-  hora_fin:          z.string().min(1, 'La hora de fin es requerida.'),
-  password_pri:      z.string().min(1, 'La contraseña de firma es requerida.'),
+  tipo_contingencia:     z.coerce.number().min(1).max(5),
+  motivo_contingencia:   z.string().min(5, 'Mínimo 5 caracteres.'),
+  fecha_inicio:          z.string().min(1, 'La fecha de inicio es requerida.'),
+  hora_inicio:           z.string().min(1, 'La hora de inicio es requerida.'),
+  fecha_fin:             z.string().min(1, 'La fecha de fin es requerida.'),
+  hora_fin:              z.string().min(1, 'La hora de fin es requerida.'),
+  password_pri:          z.string().min(1, 'La contraseña de firma es requerida.'),
+  nombre_responsable:    z.string().min(1, 'El nombre del responsable es requerido.').max(100),
+  tipo_doc_responsable:  z.enum(['13', '02', '03', '36', '37'], {
+    required_error: 'El tipo de documento es requerido.',
+  }),
+  num_doc_responsable:   z.string().min(3, 'Mínimo 3 caracteres.').max(25, 'Máximo 25 caracteres.'),
 }).refine(
   (d) => {
     const inicio = new Date(`${d.fecha_inicio}T${d.hora_inicio}`);
@@ -70,13 +88,14 @@ const Contingencia = () => {
   const [error,           setError]           = useState(null);
   const [seleccionados,   setSeleccionados]   = useState([]);
   const [showPassword,    setShowPassword]    = useState(false);
+  const [showResponsable, setShowResponsable] = useState(false);
   const [errorApi,        setErrorApi]        = useState('');
   const [contadorRecarga, setContadorRecarga] = useState(0);
 
   // Todos los hooks ANTES de returns condicionales
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schemaNotificar),
-    defaultValues: { tipo_contingencia: 1, motivo: '', fecha_inicio: '', hora_inicio: '', fecha_fin: '', hora_fin: '', password_pri: '' },
+    defaultValues: { tipo_contingencia: 1, motivo_contingencia: '', fecha_inicio: '', hora_inicio: '', fecha_fin: '', hora_fin: '', password_pri: '', nombre_responsable: '', tipo_doc_responsable: '36', num_doc_responsable: '' },
   });
 
   const recargar = useCallback(() => setContadorRecarga((p) => p + 1), []);
@@ -87,11 +106,22 @@ const Contingencia = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const dtesData = await listarContingenciaApi();
+        const [dtesData, config] = await Promise.all([
+          listarContingenciaApi(),
+          obtenerConfiguracionApi().catch(() => null),
+        ]);
         if (!cancelado) {
           setDtes(dtesData?.dtes ?? []);
+          if (config?.nombre) {
+            reset((prev) => ({
+              ...prev,
+              nombre_responsable: config.nombre,
+              tipo_doc_responsable: '36',
+              num_doc_responsable: config.nit || '',
+            }));
+          }
         }
-      } catch (_) {
+      } catch {
         if (!cancelado) setError('No se pudieron cargar los datos de contingencia.');
       } finally {
         if (!cancelado) setIsLoading(false);
@@ -99,7 +129,7 @@ const Contingencia = () => {
     };
     cargar();
     return () => { cancelado = true; };
-  }, [contadorRecarga]);
+  }, [contadorRecarga, reset]);
 
   // ── Selección de DTEs ──
   const toggleSeleccion = (id) => {
@@ -125,14 +155,17 @@ const Contingencia = () => {
       }
 
       await notificarContingenciaApi({
-        tipo_contingencia:   Number(datos.tipo_contingencia),
-        motivo:              datos.motivo,
-        fecha_inicio:        datos.fecha_inicio,
-        hora_inicio:         datos.hora_inicio,
-        fecha_fin:           datos.fecha_fin,
-        hora_fin:            datos.hora_fin,
-        password_pri:        datos.password_pri,
-        codigos_generacion:  codigosSeleccionados,
+        tipo_contingencia:     Number(datos.tipo_contingencia),
+        motivo_contingencia:   datos.motivo_contingencia,
+        fecha_inicio:          datos.fecha_inicio,
+        hora_inicio:           datos.hora_inicio,
+        fecha_fin:             datos.fecha_fin,
+        hora_fin:              datos.hora_fin,
+        password_pri:          datos.password_pri,
+        codigos_generacion:    codigosSeleccionados,
+        nombre_responsable:    datos.nombre_responsable,
+        tipo_doc_responsable:  datos.tipo_doc_responsable,
+        num_doc_responsable:   datos.num_doc_responsable,
       });
       toast.success('Evento de contingencia notificado al MH.');
       reset((v) => ({ ...v, password_pri: '' })); // limpiar passwordPri
@@ -269,17 +302,70 @@ const Contingencia = () => {
 
               {/* Motivo */}
               <div>
-                <label htmlFor="motivo" className="label">
+                <label htmlFor="motivo_contingencia" className="label">
                   Motivo <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
                 <textarea
-                  id="motivo"
+                  id="motivo_contingencia"
                   rows={2}
-                  className={`input resize-none ${errors.motivo ? 'input-error' : ''}`}
+                  className={`input resize-none ${errors.motivo_contingencia ? 'input-error' : ''}`}
                   placeholder="Describe brevemente el motivo de la contingencia..."
-                  {...register('motivo')}
+                  {...register('motivo_contingencia')}
                 />
-                {errors.motivo && <p className="error-msg" role="alert">{errors.motivo.message}</p>}
+                {errors.motivo_contingencia && <p className="error-msg" role="alert">{errors.motivo_contingencia.message}</p>}
+              </div>
+
+              {/* Responsable — sección colapsable con precarga desde config */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowResponsable((p) => !p)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  {showResponsable
+                    ? <ChevronDown className="w-4 h-4" aria-hidden="true" />
+                    : <ChevronRight className="w-4 h-4" aria-hidden="true" />
+                  }
+                  Datos del responsable
+                  <span className="text-xs text-gray-400 font-normal">(precargado desde config)</span>
+                </button>
+                {showResponsable && (
+                  <div className="px-3 pb-3 space-y-3 border-t border-gray-200 pt-3">
+                    <div>
+                      <label htmlFor="nombre_responsable" className="label">
+                        Nombre <span className="text-red-500" aria-hidden="true">*</span>
+                      </label>
+                      <input id="nombre_responsable" type="text"
+                        className={`input ${errors.nombre_responsable ? 'input-error' : ''}`}
+                        placeholder="Nombre del responsable"
+                        {...register('nombre_responsable')} />
+                      {errors.nombre_responsable && <p className="error-msg" role="alert">{errors.nombre_responsable.message}</p>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="tipo_doc_responsable" className="label">
+                          Tipo doc. <span className="text-red-500" aria-hidden="true">*</span>
+                        </label>
+                        <select id="tipo_doc_responsable" className="input" {...register('tipo_doc_responsable')}>
+                          {TIPO_DOC_RESPONSABLE.map((t) => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                          ))}
+                        </select>
+                        {errors.tipo_doc_responsable && <p className="error-msg" role="alert">{errors.tipo_doc_responsable.message}</p>}
+                      </div>
+                      <div>
+                        <label htmlFor="num_doc_responsable" className="label">
+                          N° documento <span className="text-red-500" aria-hidden="true">*</span>
+                        </label>
+                        <input id="num_doc_responsable" type="text"
+                          className={`input ${errors.num_doc_responsable ? 'input-error' : ''}`}
+                          placeholder="NIT / DUI / Pasaporte"
+                          {...register('num_doc_responsable')} />
+                        {errors.num_doc_responsable && <p className="error-msg" role="alert">{errors.num_doc_responsable.message}</p>}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Fechas */}

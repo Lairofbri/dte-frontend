@@ -31,8 +31,11 @@ const FORMAS_PAGO = [
   { value: '03', label: 'Tarjeta crédito (03)' },
   { value: '04', label: 'Cheque (04)' },
   { value: '05', label: 'Transferencia (05)' },
+  { value: '06', label: 'Tarjeta Empresarial (06)' },
+  { value: '07', label: 'Bono (07)' },
   { value: '08', label: 'Dinero electrónico (08)' },
   { value: '09', label: 'Monedero electrónico (09)' },
+  { value: '10', label: 'Vales (10)' },
   { value: '11', label: 'Bitcoin (11)' },
   { value: '12', label: 'Otras criptomonedas (12)' },
   { value: '13', label: 'Cuentas por pagar del receptor (13)' },
@@ -188,7 +191,6 @@ const schemaNCND = schemaBase.extend({
   fusion:            z.string().optional().or(z.literal('')),
   observaciones:     z.string().max(3000, 'Máximo 3000 caracteres.').optional().or(z.literal('')),
 }).refine((d) => {
-  if (!d.doc_rel_fecha) return true;
   if (isNaN(Date.parse(d.doc_rel_fecha))) return false;
   const fecha = new Date(d.doc_rel_fecha);
   return fecha <= new Date();
