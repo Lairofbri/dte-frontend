@@ -39,7 +39,7 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       await logoutApi();
-    } catch (_) {
+    } catch {
       // Si falla el API igual limpiamos el store local
     } finally {
       limpiarStore();

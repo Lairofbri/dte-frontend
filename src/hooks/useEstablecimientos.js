@@ -26,7 +26,7 @@ export const useEstablecimientos = () => {
       try {
         const datos = await listarEstablecimientosApi();
         if (!cancelado) setEstablecimientos(datos?.establecimientos ?? datos ?? []);
-      } catch (err) {
+      } catch {
         if (!cancelado) setError('No se pudieron cargar los establecimientos.');
       } finally {
         if (!cancelado) setIsLoading(false);

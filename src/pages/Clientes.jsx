@@ -37,7 +37,7 @@ const useClientes = () => {
         if (filtroTipo)      params.tipo_cliente = filtroTipo;
         const datos = await buscarClientesApi(params);
         if (!cancelado) setClientes(datos?.clientes ?? []);
-      } catch (_) {
+      } catch {
         if (!cancelado) setError('No se pudieron cargar los clientes.');
       } finally {
         if (!cancelado) setIsLoading(false);

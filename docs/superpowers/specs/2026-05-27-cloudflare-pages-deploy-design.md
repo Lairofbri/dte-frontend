@@ -47,7 +47,7 @@ Cada push a `develop` despliega automáticamente en staging. Cuando se hace merg
 
 | Variable | Producción | Staging |
 |---|---|---|
-| `VITE_API_URL` | URL del backend de producción | URL del backend de staging (ej: Railway staging) |
+| `VITE_API_URL` | URL del backend de producción | URL del backend de staging (ej: Docker local) |
 | `NODE_VERSION` | `20` | `20` |
 
 ### SPA fallback (Single Page Application)

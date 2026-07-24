@@ -114,7 +114,7 @@ const Configuracion = () => {
           });
           setEsProduccion(config.ambiente === '01');
         }
-      } catch (err) {
+      } catch {
         if (!cancelado) setError('No se pudo cargar la configuración.');
       } finally {
         if (!cancelado) setIsLoading(false);
@@ -152,7 +152,7 @@ const Configuracion = () => {
     try {
       await testFirmadorApi();
       setEstadoFirmador('ok');
-    } catch (_) {
+    } catch {
       setEstadoFirmador('error');
     }
   };

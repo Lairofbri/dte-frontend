@@ -63,7 +63,7 @@ const Login = () => {
     setErrorGeneral('');
     try {
       await login({ email: datos.email, password: datos.password });
-    } catch (_) {
+    } catch {
       // Mensaje fijo — nunca del API (lección de CUBIC)
       setErrorGeneral('Correo o contraseña incorrectos.');
       // Limpiar solo el password — mantener el email

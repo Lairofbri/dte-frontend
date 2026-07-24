@@ -9,7 +9,7 @@
     "not_found_handling": "single-page-application"
   },
   "vars": {
-    "VITE_API_URL": "https://dte-service-production.up.railway.app"
+    "VITE_API_URL": "http://localhost:4000"
   },
   "compatibility_flags": [
     "nodejs_compat"
