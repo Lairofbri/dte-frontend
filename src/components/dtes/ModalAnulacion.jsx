@@ -108,7 +108,7 @@ const ModalAnulacion = ({ isOpen, onClose, onConfirmar, anulando, numeroDTE }) =
       await onConfirmar(payload);
       setShowPassword(false);
       reset();
-    } catch (_) {
+    } catch {
       reset((v) => ({ ...v, password_pri: '' }));
     }
   };

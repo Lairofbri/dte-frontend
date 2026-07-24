@@ -39,11 +39,17 @@ export const useDTEs = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const params = { pagina: filtros.pagina, limite: filtros.limite };
-        if (filtros.tipo_dte)    params.tipo_dte    = filtros.tipo_dte;
-        if (filtros.estado)      params.estado      = filtros.estado;
-        if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde;
-        if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta;
+        const pagina = Number(searchParams.get('pagina')) || 1;
+        const limite = Number(searchParams.get('limite')) || 20;
+        const params = { pagina, limite };
+        const tipoDte = searchParams.get('tipo_dte');
+        const estado = searchParams.get('estado');
+        const fechaDesde = searchParams.get('fecha_desde');
+        const fechaHasta = searchParams.get('fecha_hasta');
+        if (tipoDte)    params.tipo_dte    = tipoDte;
+        if (estado)     params.estado      = estado;
+        if (fechaDesde) params.fecha_desde = fechaDesde;
+        if (fechaHasta) params.fecha_hasta = fechaHasta;
 
         const resultado = await listarDTEsApi(params);
 
@@ -52,7 +58,7 @@ export const useDTEs = () => {
           setDtes(resultado?.dtes ?? []);
           setPaginacion(resultado?.paginacion ?? { total: 0, pagina: 1, limite: 20, paginas: 0 });
         }
-      } catch (err) {
+      } catch {
         if (!cancelado) {
           setError('No se pudieron cargar los DTEs.');
         }

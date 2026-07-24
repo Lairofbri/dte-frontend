@@ -30,13 +30,13 @@ const App = () => {
           accessToken: resultado.access_token,
           usuario,
         });
-      } catch (_) {
+      } catch {
         logout();
       }
     };
 
     verificarSesion();
-  }, []);
+  }, [logout, setAccessToken, setAuth]);
 
   return (
     <>

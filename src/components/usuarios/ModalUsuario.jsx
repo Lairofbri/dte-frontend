@@ -55,8 +55,10 @@ const ModalUsuario = ({ isOpen, onClose, onGuardar, usuario = null, establecimie
 
   useEffect(() => {
     if (isOpen) {
-      setShowPassword(false);
-      setErrorApi('');
+      queueMicrotask(() => {
+        setShowPassword(false);
+        setErrorApi('');
+      });
       reset({
         nombre:             usuario?.nombre             ?? '',
         email:              usuario?.email              ?? '',

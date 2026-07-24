@@ -22,7 +22,7 @@ export default defineConfig({
   use: {
     baseURL:    BASE,
     screenshot: 'only-on-failure',
-    video:      'retain-on-failure',
+    video:      'on',
     trace:      'on-first-retry',
     // Todos los tests usan la sesión guardada por globalSetup
     storageState: 'tests/.auth/session.json',

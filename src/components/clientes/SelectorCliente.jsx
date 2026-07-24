@@ -41,19 +41,18 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const resultadosVisibles = !busqueda.trim() ? [] : resultados;
+  const abiertoVisible     = abierto && busqueda.trim().length > 0;
+
   // Búsqueda con debounce + race condition guard
   useEffect(() => {
     if (clienteSelec) return; // Ya seleccionado — no buscar
-    if (!busqueda.trim()) {
-      setResultados([]);
-      setAbierto(false);
-      return;
-    }
+    if (!busqueda.trim()) return;
 
     let cancelado = false;
-    setIsLoading(true);
 
     const timer = setTimeout(async () => {
+      setIsLoading(true);
       try {
         const params = { q: busqueda.trim(), limite: 8 };
         const tipo = getTipoSugerido(tipoDte);
@@ -64,7 +63,7 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
           setAbierto(true);
           setActivoIdx(-1);
         }
-      } catch (_) {
+      } catch {
         if (!cancelado) setResultados([]);
       } finally {
         if (!cancelado) setIsLoading(false);
@@ -124,16 +123,16 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
 
   // Navegación con teclado
   const onKeyDown = (e) => {
-    if (!abierto || resultados.length === 0) return;
+    if (!abiertoVisible || resultadosVisibles.length === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActivoIdx(p => Math.min(p + 1, resultados.length - 1));
+      setActivoIdx(p => Math.min(p + 1, resultadosVisibles.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActivoIdx(p => Math.max(p - 1, 0));
     } else if (e.key === 'Enter' && activoIdx >= 0) {
       e.preventDefault();
-      seleccionar(resultados[activoIdx]);
+      seleccionar(resultadosVisibles[activoIdx]);
     } else if (e.key === 'Escape') {
       setAbierto(false);
     }
@@ -157,7 +156,7 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
           id={inputId}
           type="text"
           role="combobox"
-          aria-expanded={abierto}
+          aria-expanded={abiertoVisible}
           aria-controls={listboxId}
           aria-autocomplete="list"
           aria-activedescendant={activoIdx >= 0 ? `${listboxId}-${activoIdx}` : undefined}
@@ -166,7 +165,7 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
             setBusqueda(e.target.value);
             if (clienteSelec) setClienteSelec(null);
           }}
-          onFocus={() => { if (resultados.length > 0) setAbierto(true); }}
+          onFocus={() => { if (resultadosVisibles.length > 0) setAbierto(true); }}
           onKeyDown={onKeyDown}
           placeholder={
             tipoDte === '03' ? 'Buscar empresa (NIT, NRC, nombre)...' :
@@ -211,19 +210,19 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
       )}
 
       {/* Dropdown */}
-      {abierto && (
+      {abiertoVisible && (
         <ul
           id={listboxId}
           role="listbox"
           aria-label="Resultados de búsqueda de clientes"
           className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
 
-          {resultados.length === 0 ? (
+          {resultadosVisibles.length === 0 ? (
             <li className="px-4 py-3 text-sm text-gray-400 text-center">
               Sin resultados — ¿deseas crear este cliente?
             </li>
           ) : (
-            resultados.map((cliente, idx) => (
+            resultadosVisibles.map((cliente, idx) => (
               <li
                 key={cliente.id}
                 id={`${listboxId}-${idx}`}

@@ -7,7 +7,7 @@ import { useEffect, useId, useState } from 'react';
 import { useForm }     from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z }           from 'zod';
-import { Loader2 }     from 'lucide-react';
+
 import Modal  from '../ui/Modal';
 import Button from '../ui/Button';
 

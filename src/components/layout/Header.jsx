@@ -14,7 +14,7 @@ const Header = ({ onMenuClick, titulo }) => {
   const handleLogout = async () => {
     try {
       await logoutApi();
-    } catch (_) {
+    } catch {
       // Si falla el API igual hacemos logout local
     } finally {
       logout();

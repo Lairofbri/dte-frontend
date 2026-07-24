@@ -20,7 +20,7 @@ export const useUsuarios = () => {
       try {
         const datos = await listarUsuariosApi();
         if (!cancelado) setUsuarios(datos?.usuarios ?? datos ?? []);
-      } catch (_) {
+      } catch {
         if (!cancelado) setError('No se pudieron cargar los usuarios.');
       } finally {
         if (!cancelado) setIsLoading(false);

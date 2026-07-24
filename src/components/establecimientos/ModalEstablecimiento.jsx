@@ -126,7 +126,7 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
           e.id !== establecimiento?.id
       );
       setEstadoCod(existe ? 'ocupado' : 'disponible');
-    } catch (_) {
+    } catch {
       setEstadoCod(null);
     }
   }, [watch, establecimiento]);

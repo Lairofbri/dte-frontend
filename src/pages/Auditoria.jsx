@@ -76,16 +76,20 @@ const Auditoria = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const params = { pagina: filtros.pagina, limite: filtros.limite };
-        if (filtros.evento)      params.evento      = filtros.evento;
-        if (filtros.fecha_desde) params.fecha_desde = filtros.fecha_desde;
-        if (filtros.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta;
+        const pagina = Number(searchParams.get('pagina')) || 1;
+        const params = { pagina, limite: 20 };
+        const evento = searchParams.get('evento');
+        const fechaDesde = searchParams.get('fecha_desde');
+        const fechaHasta = searchParams.get('fecha_hasta');
+        if (evento)      params.evento      = evento;
+        if (fechaDesde) params.fecha_desde = fechaDesde;
+        if (fechaHasta) params.fecha_hasta = fechaHasta;
         const datos = await listarAuditoriaApi(params);
         if (!cancelado) {
           setRegistros(datos?.registros ?? []);
           setPaginacion(datos?.paginacion ?? { total: 0, pagina: 1, limite: 20 });
         }
-      } catch (_) {
+      } catch {
         if (!cancelado) setError('No se pudo cargar el log de auditoría.');
       } finally {
         if (!cancelado) setIsLoading(false);

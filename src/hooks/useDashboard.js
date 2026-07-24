@@ -2,7 +2,7 @@
 // Orquesta todas las llamadas del dashboard
 // Separa la lógica de datos de la UI
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { obtenerResumenApi } from '../api/auditoria.api';
 import { listarDTEsApi }     from '../api/dtes.api';
 
@@ -12,31 +12,36 @@ export const useDashboard = () => {
   const [dtesRechazados,    setDtesRechazados]    = useState([]);
   const [isLoading,         setIsLoading]         = useState(true);
   const [error,             setError]             = useState(null);
+  const [recargaKey,        setRecargaKey]        = useState(0);
 
-  const cargarDatos = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Cargar todas las métricas en paralelo
-      const [resumenData, contingenciaData, rechazadosData] = await Promise.all([
-        obtenerResumenApi(),
-        listarDTEsApi({ estado: 'contingencia', limite: 5 }),
-        listarDTEsApi({ estado: 'rechazado',    limite: 5 }),
-      ]);
-
-      setResumen(resumenData);
-      setDtesContingencia(contingenciaData?.dtes ?? []);
-      setDtesRechazados(rechazadosData?.dtes     ?? []);
-    } catch (err) {
-      setError('No se pudieron cargar los datos del dashboard.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const recargar = useCallback(() => setRecargaKey(k => k + 1), []);
 
   useEffect(() => {
-    cargarDatos();
-  }, []);
+    let cancelado = false;
+    const cargar = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [resumenData, contingenciaData, rechazadosData] = await Promise.all([
+          obtenerResumenApi(),
+          listarDTEsApi({ estado: 'contingencia', limite: 5 }),
+          listarDTEsApi({ estado: 'rechazado',    limite: 5 }),
+        ]);
+
+        if (!cancelado) {
+          setResumen(resumenData);
+          setDtesContingencia(contingenciaData?.dtes ?? []);
+          setDtesRechazados(rechazadosData?.dtes     ?? []);
+        }
+      } catch {
+        if (!cancelado) setError('No se pudieron cargar los datos del dashboard.');
+      } finally {
+        if (!cancelado) setIsLoading(false);
+      }
+    };
+    cargar();
+    return () => { cancelado = true; };
+  }, [recargaKey]);
 
   return {
     resumen,
@@ -44,6 +49,6 @@ export const useDashboard = () => {
     dtesRechazados,
     isLoading,
     error,
-    recargar: cargarDatos,
+    recargar,
   };
 };

@@ -1,6 +1,11 @@
 name: Playwright Tests
+
 on:
-  workflow_dispatch:  # solo manual desde GitHub UI
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
 jobs:
   test:
     timeout-minutes: 60
