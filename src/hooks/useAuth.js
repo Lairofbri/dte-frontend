@@ -15,10 +15,10 @@ export const useAuth = () => {
   /**
    * Login con email + password
    */
-  const login = async ({ email, password }) => {
+  const login = async ({ email, password, tenant_id }) => {
     setIsLoading(true);
     try {
-      const resultado = await loginApi({ email, password });
+      const resultado = await loginApi({ email, password, tenant_id });
       setAuth({
         accessToken: resultado.access_token,
         usuario:     resultado.usuario,

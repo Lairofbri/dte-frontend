@@ -62,7 +62,7 @@ const Establecimientos = () => {
       key:    'tipo',
       header: 'Tipo',
       render: (valor) => {
-        const tipos = { '02': 'Casa Matriz', '07': 'Sucursal', '20': 'Empresa en Casa' };
+        const tipos = { '01': 'Casa Matriz', '02': 'Sucursal', '04': 'Bodega', '07': 'Punto de venta' };
         return <span className="text-sm text-gray-600">{tipos[valor] ?? valor}</span>;
       },
     },

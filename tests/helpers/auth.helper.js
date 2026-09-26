@@ -20,6 +20,14 @@ export const CREDENCIALES = {
  */
 export const loginComoAdmin = async (page) => {
   await page.goto(url('/login'));
+  await page.waitForFunction(() => (
+    document.querySelector('#tenant_id') ||
+    document.querySelector('button[type="submit"]:not([disabled])')
+  ));
+  const tenantSelect = page.locator('#tenant_id');
+  if (await tenantSelect.count()) {
+    await tenantSelect.selectOption({ index: 1 });
+  }
   await page.fill('#email',    CREDENCIALES.admin.email);
   await page.fill('#password', CREDENCIALES.admin.password);
   await page.click('button[type="submit"]');

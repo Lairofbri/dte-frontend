@@ -60,6 +60,7 @@ const MUNICIPIOS = {
 const codRegex = /^[A-Z0-9]{1,4}$/i;
 
 const schema = z.object({
+  tipo_establecimiento: z.enum(['01', '02', '04', '07']),
   nombre:             z.string().min(3, 'Mínimo 3 caracteres.'),
   cod_estable_mh:     z.string().min(1, 'Requerido.').regex(codRegex, '1-4 caracteres alfanuméricos.'),
   cod_punto_venta_mh: z.string().min(1, 'Requerido.').regex(codRegex, '1-4 caracteres alfanuméricos.'),
@@ -84,7 +85,7 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
     register,
     handleSubmit,
     reset,
-    watch,
+    getValues,
     formState: { errors, isSubmitting, isValid },
   } = useForm({
     resolver: zodResolver(schema),
@@ -94,26 +95,29 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
   useEffect(() => {
     if (isOpen) {
       const depto = establecimiento?.departamento_cod ?? '06';
-      setDeptoActual(depto);
-      setEstadoCod(null);
-      setErrorApi('');
-      reset({
-        nombre:             establecimiento?.nombre             ?? '',
-        cod_estable_mh:     establecimiento?.cod_estable_mh     ?? '',
-        cod_punto_venta_mh: establecimiento?.cod_punto_venta_mh ?? '',
-        direccion:          establecimiento?.direccion          ?? '',
-        departamento_cod:   depto,
-        municipio_cod:      establecimiento?.municipio_cod      ?? '01',
-        telefono:           establecimiento?.telefono           ?? '',
-        email:              establecimiento?.email              ?? '',
+      queueMicrotask(() => {
+        setDeptoActual(depto);
+        setEstadoCod(null);
+        setErrorApi('');
+        reset({
+          tipo_establecimiento: establecimiento?.tipo_establecimiento ?? '02',
+          nombre:             establecimiento?.nombre             ?? '',
+          cod_estable_mh:     establecimiento?.cod_estable_mh     ?? '',
+          cod_punto_venta_mh: establecimiento?.cod_punto_venta_mh ?? '',
+          direccion:          establecimiento?.direccion          ?? '',
+          departamento_cod:   depto,
+          municipio_cod:      establecimiento?.municipio_cod      ?? '01',
+          telefono:           establecimiento?.telefono           ?? '',
+          email:              establecimiento?.email              ?? '',
+        });
       });
     }
   }, [isOpen, establecimiento, reset]);
 
   // ── Verificar combinación sucursal+caja al salir del campo ──
   const verificarCombinacion = useCallback(async () => {
-    const codEstable = watch('cod_estable_mh');
-    const codPvta    = watch('cod_punto_venta_mh');
+    const codEstable = getValues('cod_estable_mh');
+    const codPvta    = getValues('cod_punto_venta_mh');
     if (!codEstable || !codPvta) return;
     setEstadoCod('verificando');
     try {
@@ -129,7 +133,7 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
     } catch {
       setEstadoCod(null);
     }
-  }, [watch, establecimiento]);
+  }, [getValues, establecimiento]);
 
   // ── Autoformatear teléfono: 00000000 → 0000-0000 ──
   const formatearTelefono = (e) => {
@@ -173,6 +177,24 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
         )}
 
         <div className="grid grid-cols-2 gap-4">
+
+          {/* Tipo de establecimiento MH */}
+          <div>
+            <label htmlFor={`${formId}-tipo`} className="label">
+              Tipo MH <span className="text-red-500" aria-hidden="true">*</span>
+            </label>
+            <select
+              id={`${formId}-tipo`}
+              className={`input ${errors.tipo_establecimiento ? 'input-error' : ''}`}
+              {...register('tipo_establecimiento')}
+            >
+              <option value="01">Casa Matriz</option>
+              <option value="02">Sucursal</option>
+              <option value="04">Bodega</option>
+              <option value="07">Punto de venta</option>
+            </select>
+            {errors.tipo_establecimiento && <p className="error-msg" role="alert">{errors.tipo_establecimiento.message}</p>}
+          </div>
 
           {/* Nombre */}
           <div className="col-span-2">

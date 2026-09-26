@@ -17,6 +17,8 @@ export const useAuthStore = create((set) => ({
   // ─────────────────────────────────────────────
   accessToken:     null,
   usuario:         null,
+  tenantId:        null,
+  establecimientoId: null,
   isAuthenticated: false,
   isLoading:       true,
 
@@ -26,6 +28,8 @@ export const useAuthStore = create((set) => ({
   setAuth: ({ accessToken, usuario }) => set({
     accessToken,
     usuario,
+    tenantId: usuario?.tenant_id || null,
+    establecimientoId: usuario?.establecimiento_id || null,
     isAuthenticated: true,
     isLoading:       false,
   }),
@@ -35,6 +39,8 @@ export const useAuthStore = create((set) => ({
   logout: () => set({
     accessToken:     null,
     usuario:         null,
+    tenantId:        null,
+    establecimientoId: null,
     isAuthenticated: false,
     isLoading:       false,
   }),
@@ -51,7 +57,10 @@ export const selectEsAdmin =
   (state) => state.usuario?.rol === 'administrador';
 
 export const selectEstablecimientoId =
-  (state) => state.usuario?.establecimiento_id;
+  (state) => state.establecimientoId;
+
+export const selectTenantId =
+  (state) => state.tenantId;
 
 export const selectNombreUsuario =
   (state) => state.usuario?.nombre;

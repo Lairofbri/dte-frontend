@@ -9,8 +9,8 @@ import api from './axios';
  * El refresh token llega en httpOnly cookie automáticamente
  * Solo necesitamos guardar el access_token del body
  */
-export const loginApi = async ({ email, password }) => {
-  const { data } = await api.post('/api/auth/login', { email, password });
+export const loginApi = async ({ email, password, tenant_id }) => {
+  const { data } = await api.post('/api/auth/login', { email, password, tenant_id });
   return data.data; // { access_token, token_type, expira_en, usuario }
 };
 

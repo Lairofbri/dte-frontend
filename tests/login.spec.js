@@ -143,3 +143,34 @@ test.describe('Login', () => {
   });
 
 });
+
+test.describe('Login — selección de empresa', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('debe exigir empresa cuando el tenant público devuelve varias opciones', async ({ page }) => {
+    await page.route('**/api/tenants', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          data: [
+            { id: 'a0000000-0000-4000-8000-000000000001', nombre: 'Empresa A' },
+            { id: 'b0000000-0000-4000-8000-000000000002', nombre: 'Empresa B' },
+          ],
+        }),
+      });
+    });
+
+    await page.goto(url('/login'));
+    await expect(page.locator('#tenant_id')).toBeVisible();
+
+    await page.fill('#email', 'admin@empresa.com');
+    await page.fill('#password', 'Password123!');
+    await expect(page.locator('button[type="submit"]')).toBeDisabled();
+    await expect(page.locator('#tenant_id')).toHaveValue('');
+
+    await page.selectOption('#tenant_id', 'a0000000-0000-4000-8000-000000000001');
+    await expect(page.locator('button[type="submit"]')).toBeEnabled();
+  });
+});

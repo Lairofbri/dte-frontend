@@ -22,7 +22,7 @@ const ESTADOS = [
   { value: 'anulado',      label: 'Anulado' },
 ];
 
-const FiltrosDTE = ({ filtros, onChange, onLimpiar, hayFiltrosActivos }) => (
+const FiltrosDTE = ({ filtros, establecimientos = [], mostrarEstablecimiento = false, onChange, onLimpiar, hayFiltrosActivos }) => (
   <div className="card mb-4">
     <div className="card-body py-3">
       <div className="flex flex-wrap items-end gap-3">
@@ -46,6 +46,25 @@ const FiltrosDTE = ({ filtros, onChange, onLimpiar, hayFiltrosActivos }) => (
             ))}
           </select>
         </div>
+
+        {mostrarEstablecimiento && (
+          <div className="flex-1 min-w-[180px]">
+            <label htmlFor="filtro-establecimiento" className="label">Establecimiento</label>
+            <select
+              id="filtro-establecimiento"
+              value={filtros.establecimiento_id}
+              onChange={(e) => onChange('establecimiento_id', e.target.value)}
+              className="input"
+            >
+              <option value="">Todos los establecimientos</option>
+              {establecimientos.map((establecimiento) => (
+                <option key={establecimiento.id} value={establecimiento.id}>
+                  {establecimiento.nombre} ({establecimiento.cod_estable_mh})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Estado */}
         <div className="flex-1 min-w-[140px]">

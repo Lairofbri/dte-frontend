@@ -5,6 +5,8 @@
 import { useNavigate }          from 'react-router-dom';
 import { Plus, RefreshCw }      from 'lucide-react';
 import { useDTEs }              from '../../hooks/useDTEs';
+import { useEstablecimientos }  from '../../hooks/useEstablecimientos';
+import { useAuthStore, selectEsAdmin } from '../../store/auth.store';
 import FiltrosDTE               from '../../components/dtes/FiltrosDTE';
 import Badge                    from '../../components/ui/Badge';
 import Table                    from '../../components/ui/Table';
@@ -85,6 +87,8 @@ const DTEListado = () => {
     hayFiltrosActivos, cambiarFiltro, cambiarPagina,
     limpiarFiltros, recargar,
   } = useDTEs();
+  const esAdmin = useAuthStore(selectEsAdmin);
+  const { establecimientos } = useEstablecimientos({ enabled: esAdmin });
 
   if (error) {
     return (
@@ -121,6 +125,8 @@ const DTEListado = () => {
       {/* Filtros — sincronizados con URL */}
       <FiltrosDTE
         filtros={filtros}
+        establecimientos={establecimientos}
+        mostrarEstablecimiento={esAdmin}
         onChange={cambiarFiltro}
         onLimpiar={limpiarFiltros}
         hayFiltrosActivos={hayFiltrosActivos}

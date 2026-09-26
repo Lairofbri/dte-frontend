@@ -9,34 +9,41 @@ import router from './router';
 import { refreshApi, meApi } from './api/auth.api';
 import { useAuthStore } from './store/auth.store';
 
+let restauracionEnCurso = null;
+
+const restaurarSesion = async ({ refresh, setAccessToken, setAuth, logout, setLoading }) => {
+  try {
+    const resultado = await refresh();
+    setAccessToken(resultado.access_token);
+
+    const usuario = await meApi();
+    setAuth({
+      accessToken: resultado.access_token,
+      usuario,
+    });
+  } catch {
+    logout();
+  } finally {
+    setLoading(false);
+  }
+};
+
 const App = () => {
-  const { setAuth, logout, setAccessToken } = useAuthStore();
+  const { setAuth, logout, setAccessToken, setLoading } = useAuthStore();
 
   useEffect(() => {
-    const verificarSesion = async () => {
-      try {
-        // 1. Renovar access token con cookie httpOnly
-        const resultado = await refreshApi();
-
-        // 2. Guardar token ANTES de llamar meApi()
-        //    Fix CUBIC: el interceptor necesita el token en el store
-        setAccessToken(resultado.access_token);
-
-        // 3. Obtener datos del usuario
-        const usuario = await meApi();
-
-        // 4. Guardar todo en el store
-        setAuth({
-          accessToken: resultado.access_token,
-          usuario,
-        });
-      } catch {
-        logout();
-      }
-    };
-
-    verificarSesion();
-  }, [logout, setAccessToken, setAuth]);
+    if (!restauracionEnCurso) {
+      restauracionEnCurso = restaurarSesion({
+        refresh: refreshApi,
+        setAccessToken,
+        setAuth,
+        logout,
+        setLoading,
+      }).finally(() => {
+        restauracionEnCurso = null;
+      });
+    }
+  }, [logout, setAccessToken, setAuth, setLoading]);
 
   return (
     <>

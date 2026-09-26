@@ -4,7 +4,7 @@
 // Campos jurídicos: NIT+NRC+actividad obligatorios (Hacienda)
 
 import { useEffect, useId, useState } from 'react';
-import { useForm }     from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z }           from 'zod';
 
@@ -105,15 +105,15 @@ const ModalCliente = ({ isOpen, onClose, onGuardar, cliente = null }) => {
   const formId       = useId();
   const [errorApi, setErrorApi] = useState('');
 
-  const { register, handleSubmit, reset, watch, setValue,
+  const { register, handleSubmit, reset, control, setValue,
     formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     mode:     'onChange',
   });
 
-  const tipoCliente     = watch('tipo_cliente');
-  const numDocumento    = watch('num_documento');
-  const departamentoCod = watch('departamento_cod');
+  const tipoCliente     = useWatch({ control, name: 'tipo_cliente' });
+  const numDocumento    = useWatch({ control, name: 'num_documento' });
+  const departamentoCod = useWatch({ control, name: 'departamento_cod' });
   const esJuridico      = tipoCliente === 'juridico';
   const esNatural       = tipoCliente === 'natural';
 
@@ -124,22 +124,24 @@ const ModalCliente = ({ isOpen, onClose, onGuardar, cliente = null }) => {
 
   useEffect(() => {
     if (!isOpen) return;
-    setErrorApi('');
-    reset({
-      tipo_cliente:     cliente?.tipo_cliente     ?? 'natural',
-      nombre:           cliente?.nombre           ?? '',
-      nombre_comercial: cliente?.nombre_comercial ?? '',
-      tipo_documento:   cliente?.tipo_documento   ?? null,
-      num_documento:    cliente?.num_documento    ?? '',
-      nit:              cliente?.nit              ?? '',
-      nrc:              cliente?.nrc              ?? '',
-      cod_actividad:    cliente?.cod_actividad    ?? '',
-      desc_actividad:   cliente?.desc_actividad   ?? '',
-      departamento_cod: cliente?.departamento_cod ?? null,
-      municipio_cod:    cliente?.municipio_cod    ?? '',
-      direccion:        cliente?.direccion        ?? '',
-      telefono:         cliente?.telefono         ?? '',
-      correo:           cliente?.correo           ?? '',
+    queueMicrotask(() => {
+      setErrorApi('');
+      reset({
+        tipo_cliente:     cliente?.tipo_cliente     ?? 'natural',
+        nombre:           cliente?.nombre           ?? '',
+        nombre_comercial: cliente?.nombre_comercial ?? '',
+        tipo_documento:   cliente?.tipo_documento   ?? null,
+        num_documento:    cliente?.num_documento    ?? '',
+        nit:              cliente?.nit              ?? '',
+        nrc:              cliente?.nrc              ?? '',
+        cod_actividad:    cliente?.cod_actividad    ?? '',
+        desc_actividad:   cliente?.desc_actividad   ?? '',
+        departamento_cod: cliente?.departamento_cod ?? null,
+        municipio_cod:    cliente?.municipio_cod    ?? '',
+        direccion:        cliente?.direccion        ?? '',
+        telefono:         cliente?.telefono         ?? '',
+        correo:           cliente?.correo           ?? '',
+      });
     });
   }, [isOpen, cliente, reset]);
 

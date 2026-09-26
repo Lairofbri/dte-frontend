@@ -10,7 +10,7 @@ import {
   desactivarEstablecimientoApi,
 } from '../api/establecimientos.api';
 
-export const useEstablecimientos = () => {
+export const useEstablecimientos = ({ enabled = true } = {}) => {
   const [establecimientos, setEstablecimientos] = useState([]);
   const [isLoading,        setIsLoading]        = useState(true);
   const [error,            setError]            = useState(null);
@@ -19,6 +19,8 @@ export const useEstablecimientos = () => {
   // ── Cargar lista ──
   useEffect(() => {
     let cancelado = false;
+
+    if (!enabled) return () => { cancelado = true; };
 
     const cargar = async () => {
       setIsLoading(true);
@@ -35,7 +37,7 @@ export const useEstablecimientos = () => {
 
     cargar();
     return () => { cancelado = true; };
-  }, [contadorRecarga]);
+  }, [contadorRecarga, enabled]);
 
   const recargar = useCallback(() => setContadorRecarga((p) => p + 1), []);
 
@@ -63,9 +65,9 @@ export const useEstablecimientos = () => {
   }, [recargar]);
 
   return {
-    establecimientos,
-    isLoading,
-    error,
+    establecimientos: enabled ? establecimientos : [],
+    isLoading: enabled && isLoading,
+    error: enabled ? error : null,
     recargar,
     crear,
     actualizar,

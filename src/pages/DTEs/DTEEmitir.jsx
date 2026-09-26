@@ -4,7 +4,7 @@
 
 import { useState }               from 'react';
 import { useNavigate }            from 'react-router-dom';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver }            from '@hookform/resolvers/zod';
 import { z }                      from 'zod';
 import {
@@ -244,7 +244,7 @@ const DTEEmitir = () => {
   const [errorApi,  setErrorApi]      = useState('');
   const [clienteId, setClienteId]     = useState(null);
 
-  const { register, control, handleSubmit, watch, reset, setValue,
+  const { register, control, handleSubmit, reset, setValue,
     formState: { errors } } = useForm({
     resolver: zodResolver(getSchema(tipoDte)),
     defaultValues: {
@@ -261,7 +261,7 @@ const DTEEmitir = () => {
   const { fields: pagoFields, append: appendPago, remove: removePago } =
     useFieldArray({ control, name: 'pagos' });
 
-  const itemsActuales = watch('items') ?? [];
+  const itemsActuales = useWatch({ control, name: 'items' }) ?? [];
   const totales       = calcularTotales(itemsActuales, tipoDte);
   const esCCF         = tipoDte === '03';
   const esFSE         = tipoDte === '14';

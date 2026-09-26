@@ -3,7 +3,7 @@
 // passwordPri NUNCA se guarda en estado persistente — solo local en el modal
 
 import { useEffect, useId, useState } from 'react';
-import { useForm }     from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z }           from 'zod';
 import { AlertTriangle, Eye, EyeOff } from 'lucide-react';
@@ -74,13 +74,16 @@ const ModalAnulacion = ({ isOpen, onClose, onConfirmar, anulando, numeroDTE }) =
   const formId = useId();
   const [showPassword, setShowPassword] = useState(false);
 
-  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, reset, control, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     mode:     'onChange',
   });
 
-  const tipoDocResp  = watch('tipo_doc_responsable');
-  const tieneSolicita = watch('nombre_solicita') || watch('tipo_doc_solicita') || watch('num_doc_solicita');
+  const tipoDocResp = useWatch({ control, name: 'tipo_doc_responsable' });
+  const nombreSolicita = useWatch({ control, name: 'nombre_solicita' });
+  const tipoDocSolicita = useWatch({ control, name: 'tipo_doc_solicita' });
+  const numDocSolicita = useWatch({ control, name: 'num_doc_solicita' });
+  const tieneSolicita = nombreSolicita || tipoDocSolicita || numDocSolicita;
 
   const limpiarYCerrar = () => {
     setShowPassword(false);
@@ -115,17 +118,19 @@ const ModalAnulacion = ({ isOpen, onClose, onConfirmar, anulando, numeroDTE }) =
 
   useEffect(() => {
     if (isOpen) {
-      setShowPassword(false);
-      reset({
-        motivo_tipo:          '',
-        motivo_descripcion:   '',
-        nombre_responsable:   '',
-        tipo_doc_responsable: '',
-        num_doc_responsable:  '',
-        nombre_solicita:      '',
-        tipo_doc_solicita:    '',
-        num_doc_solicita:     '',
-        password_pri:         '',
+      queueMicrotask(() => {
+        setShowPassword(false);
+        reset({
+          motivo_tipo:          '',
+          motivo_descripcion:   '',
+          nombre_responsable:   '',
+          tipo_doc_responsable: '',
+          num_doc_responsable:  '',
+          nombre_solicita:      '',
+          tipo_doc_solicita:    '',
+          num_doc_solicita:     '',
+          password_pri:         '',
+        });
       });
     }
   }, [isOpen, reset]);

@@ -26,6 +26,7 @@ export const useDTEs = () => {
     estado:      searchParams.get('estado')      || '',
     fecha_desde: searchParams.get('fecha_desde') || '',
     fecha_hasta: searchParams.get('fecha_hasta') || '',
+    establecimiento_id: searchParams.get('establecimiento_id') || '',
     pagina:      Number(searchParams.get('pagina')) || 1,
     limite:      Number(searchParams.get('limite')) || 20,
   };
@@ -46,10 +47,12 @@ export const useDTEs = () => {
         const estado = searchParams.get('estado');
         const fechaDesde = searchParams.get('fecha_desde');
         const fechaHasta = searchParams.get('fecha_hasta');
+        const establecimientoId = searchParams.get('establecimiento_id');
         if (tipoDte)    params.tipo_dte    = tipoDte;
         if (estado)     params.estado      = estado;
         if (fechaDesde) params.fecha_desde = fechaDesde;
         if (fechaHasta) params.fecha_hasta = fechaHasta;
+        if (establecimientoId) params.establecimiento_id = establecimientoId;
 
         const resultado = await listarDTEsApi(params);
 
@@ -112,6 +115,7 @@ export const useDTEs = () => {
   const hayFiltrosActivos = !!(
     filtros.tipo_dte || filtros.estado ||
     filtros.fecha_desde || filtros.fecha_hasta
+    || filtros.establecimiento_id
   );
 
   return {

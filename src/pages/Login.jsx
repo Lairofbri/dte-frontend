@@ -15,9 +15,10 @@ import { Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, ReceiptText, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, ReceiptText, Loader2, Building2, RefreshCw } from 'lucide-react';
 import { useAuthStore, selectIsAuthenticated } from '../store/auth.store';
 import { useAuth } from '../hooks/useAuth';
+import { useTenants } from '../hooks/useTenants';
 
 // ─────────────────────────────────────────────
 // SCHEMA DE VALIDACIÓN ZOD
@@ -38,9 +39,11 @@ const loginSchema = z.object({
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errorGeneral, setErrorGeneral] = useState('');
+  const [tenantId, setTenantId] = useState('');
 
   const isAuthenticated = useAuthStore(selectIsAuthenticated);
   const { login, isLoading } = useAuth();
+  const { tenants, isLoading: isLoadingTenants, error: tenantsError, recargar } = useTenants();
 
   // TODOS los hooks ANTES del return condicional
   // Fix: useForm declarado UNA SOLA VEZ aquí
@@ -59,10 +62,23 @@ const Login = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
+  const empresaUnica = tenants.length === 1 ? tenants[0] : null;
+  const tenantSeleccionado = tenantId || empresaUnica?.id || '';
+  const empresaSeleccionada = tenants.find((tenant) => tenant.id === tenantSeleccionado);
+
   const onSubmit = async (datos) => {
     setErrorGeneral('');
+    if (!tenantSeleccionado) {
+      setErrorGeneral('Selecciona una empresa para continuar.');
+      return;
+    }
+
     try {
-      await login({ email: datos.email, password: datos.password });
+      await login({
+        email: datos.email,
+        password: datos.password,
+        tenant_id: tenantSeleccionado,
+      });
     } catch {
       // Mensaje fijo — nunca del API (lección de CUBIC)
       setErrorGeneral('Correo o contraseña incorrectos.');
@@ -96,6 +112,61 @@ const Login = () => {
             </h2>
 
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
+              {isLoadingTenants ? (
+                <div className="mb-5 flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary-600" aria-hidden="true" />
+                  Cargando empresas disponibles...
+                </div>
+              ) : tenantsError ? (
+                <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3">
+                  <p className="text-sm text-red-600" role="alert">{tenantsError}</p>
+                  <button
+                    type="button"
+                    onClick={recargar}
+                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-red-700 hover:text-red-800"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                    Reintentar
+                  </button>
+                </div>
+              ) : (
+                <div className="mb-5">
+                  {tenants.length > 1 ? (
+                    <>
+                      <label htmlFor="tenant_id" className="label flex items-center gap-1.5">
+                        <Building2 className="h-4 w-4 text-primary-600" aria-hidden="true" />
+                        Empresa
+                      </label>
+                      <select
+                        id="tenant_id"
+                        value={tenantSeleccionado}
+                        onChange={(event) => {
+                          setTenantId(event.target.value);
+                          setErrorGeneral('');
+                        }}
+                        className="input"
+                        required
+                      >
+                        <option value="">Seleccionar empresa...</option>
+                        {tenants.map((tenant) => (
+                          <option key={tenant.id} value={tenant.id}>{tenant.nombre}</option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-3 rounded-lg border border-primary-100 bg-primary-50/60 px-3 py-2.5">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white text-primary-700 shadow-sm">
+                        <Building2 className="h-4 w-4" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-primary-700">Empresa</p>
+                        <p className="truncate text-sm font-medium text-gray-800">{empresaSeleccionada?.nombre || 'Sin empresas activas'}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Error general */}
               {errorGeneral && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -155,7 +226,7 @@ const Login = () => {
               {/* Botón submit */}
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || isLoadingTenants || !!tenantsError || !tenantSeleccionado}
                 className="btn-primary w-full btn-lg"
               >
                 {isLoading ? (
