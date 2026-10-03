@@ -17,7 +17,7 @@ const schema = z.object({
   nombre:             z.string().min(3, 'Mínimo 3 caracteres.'),
   email:              z.string().email('Email inválido.'),
   password:           z.string().optional().or(z.literal('')),
-  rol:                z.enum(['administrador', 'operador']),
+  rol:                z.enum(['administrador', 'operador', 'plataforma']),
   establecimiento_id: z.string().uuid('Selecciona un establecimiento.'),
   _esNuevo:           z.boolean(),
 }).superRefine((data, ctx) => {
@@ -145,6 +145,7 @@ const ModalUsuario = ({ isOpen, onClose, onGuardar, usuario = null, establecimie
             <select id={`${formId}-rol`} className="input" {...register('rol')}>
               <option value="operador">Operador</option>
               <option value="administrador">Administrador</option>
+              <option value="plataforma">Plataforma</option>
             </select>
           </div>
           <div>

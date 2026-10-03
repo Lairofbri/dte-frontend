@@ -56,6 +56,9 @@ export const useAuthStore = create((set) => ({
 export const selectEsAdmin =
   (state) => state.usuario?.rol === 'administrador';
 
+export const selectEsPlataforma =
+  (state) => state.usuario?.rol === 'plataforma';
+
 export const selectEstablecimientoId =
   (state) => state.establecimientoId;
 

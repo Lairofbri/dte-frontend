@@ -8,7 +8,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, AlertTriangle, ReceiptText,
   Settings, Building2, Users, ClipboardList, UserSquare2,
-  ChevronLeft, ChevronRight, ChevronDown,
+  Rocket, ChevronLeft, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import { useAuthStore, selectEsAdmin, selectUsuario } from '../../store/auth.store';
 
@@ -28,6 +28,7 @@ const menuAdministracion = [
   { label: 'Configuración',    path: '/configuracion',    icon: Settings      },
   { label: 'Establecimientos', path: '/establecimientos', icon: Building2     },
   { label: 'Usuarios',         path: '/usuarios',         icon: Users         },
+  { label: 'Onboarding',       path: '/onboarding',       icon: Rocket        },
   { label: 'Auditoría',        path: '/auditoria',        icon: ClipboardList },
 ];
 

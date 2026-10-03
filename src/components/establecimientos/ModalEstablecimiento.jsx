@@ -9,7 +9,17 @@ import { z }                from 'zod';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import Modal  from '../ui/Modal';
 import Button from '../ui/Button';
+import { BadgeGenerico } from '../ui/Badge';
 import { listarEstablecimientosApi } from '../../api/establecimientos.api';
+
+// Estados fiscales del vínculo POS ↔ DTE (spec §5)
+const INFO_ESTADO_FISCAL = {
+  ready:           { label: 'Listo',          variant: 'green'  },
+  pending_mh_data: { label: 'Faltan datos MH', variant: 'yellow' },
+  pending_link:    { label: 'Sin vínculo',    variant: 'gray'   },
+  inactive:        { label: 'Inactivo',       variant: 'gray'   },
+  blocked:         { label: 'Bloqueado',      variant: 'red'    },
+};
 
 // ─────────────────────────────────────────────
 // DIVISIÓN TERRITORIAL EL SALVADOR
@@ -76,6 +86,9 @@ const schema = z.object({
 // ─────────────────────────────────────────────
 const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = null }) => {
   const modoEdicion = !!establecimiento;
+  // Fase 6 (spec §11): los códigos MH forman parte del número de control y
+  // NO se modifican después de emitir DTEs. El backend devuelve tiene_dtes.
+  const tieneDtes   = !!(modoEdicion && establecimiento?.tiene_dtes);
   const formId      = useId();
   const [estadoCod,    setEstadoCod]    = useState(null);
   const [errorApi,     setErrorApi]     = useState('');
@@ -149,7 +162,12 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
     if (estadoCod === 'ocupado') return;
     setErrorApi('');
     try {
-      await onGuardar(datos);
+      // Fase 6: si el establecimiento ya emitió DTEs, los códigos MH viajan
+      // como undefined → JSON.stringify los omite → el backend no los toca.
+      const payload = tieneDtes
+        ? { ...datos, cod_estable_mh: undefined, cod_punto_venta_mh: undefined }
+        : datos;
+      await onGuardar(payload);
       onClose();
     } catch (err) {
       // Mostrar error del API dentro del modal — no solo toast
@@ -173,6 +191,38 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
         {errorApi && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-600" role="alert">{errorApi}</p>
+          </div>
+        )}
+
+        {/* Fase 3: estado fiscal del vínculo POS ↔ DTE */}
+        {modoEdicion && (
+          <div className="p-3 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-gray-500">Estado fiscal del vínculo POS ↔ DTE</p>
+              {establecimiento.branch_id && (
+                <p className="text-xs font-mono text-gray-400 mt-0.5 truncate" title="branch_id compartido">
+                  branch_id: {establecimiento.branch_id}
+                </p>
+              )}
+              {establecimiento.fiscal_status === 'pending_mh_data' && (
+                <p className="text-xs text-yellow-700 mt-1">
+                  Al guardar con códigos MH y dirección fiscal completos, pasa a Listo y se sincroniza con POS.
+                </p>
+              )}
+              {establecimiento.fiscal_status === 'blocked' && establecimiento.sync_error && (
+                <p className="text-xs text-red-600 mt-1" role="alert">
+                  {establecimiento.sync_error}
+                </p>
+              )}
+            </div>
+            <BadgeGenerico variant={INFO_ESTADO_FISCAL[establecimiento.fiscal_status]?.variant ?? 'gray'}>
+              {INFO_ESTADO_FISCAL[establecimiento.fiscal_status]?.label ?? establecimiento.fiscal_status}
+            </BadgeGenerico>
+            {tieneDtes && (
+              <p className="text-xs text-amber-700 mt-1">
+                Este establecimiento ya emitió DTEs: los códigos MH no se pueden modificar porque forman parte del número de control histórico.
+              </p>
+            )}
           </div>
         )}
 
@@ -220,7 +270,9 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
               type="text"
               placeholder="0001"
               maxLength={4}
-              className={`input font-mono ${errors.cod_estable_mh ? 'input-error' : ''}`}
+              readOnly={tieneDtes}
+              title={tieneDtes ? 'No modificable: el establecimiento ya emitió DTEs' : undefined}
+              className={`input font-mono ${tieneDtes ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${errors.cod_estable_mh ? 'input-error' : ''}`}
               {...register('cod_estable_mh')}
             />
             {errors.cod_estable_mh && <p className="error-msg" role="alert">{errors.cod_estable_mh.message}</p>}
@@ -237,8 +289,10 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
                 type="text"
                 placeholder="0001"
                 maxLength={4}
-                className={`input font-mono pr-8 ${errors.cod_punto_venta_mh ? 'input-error' : ''}`}
-                {...register('cod_punto_venta_mh', { onBlur: verificarCombinacion })}
+                readOnly={tieneDtes}
+                title={tieneDtes ? 'No modificable: el establecimiento ya emitió DTEs' : undefined}
+                className={`input font-mono pr-8 ${tieneDtes ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${errors.cod_punto_venta_mh ? 'input-error' : ''}`}
+                {...register('cod_punto_venta_mh', { onBlur: tieneDtes ? undefined : verificarCombinacion })}
               />
               {estadoCod === 'verificando' && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />}
               {estadoCod === 'disponible' && <CheckCircle className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />}

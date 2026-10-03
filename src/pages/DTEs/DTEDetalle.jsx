@@ -195,8 +195,25 @@ const DTEDetalle = () => {
                   Errores Hacienda
                 </p>
                 <p className="text-sm text-red-600 mt-0.5" role="alert">
-                  {dte.errores_hacienda}
+                  {dte.errores_hacienda.descripcion ?? String(dte.errores_hacienda)}
                 </p>
+                {dte.errores_hacienda.codigo && (
+                  <p className="text-xs text-red-400 mt-1 font-mono">
+                    Código: {dte.errores_hacienda.codigo}
+                  </p>
+                )}
+                {Array.isArray(dte.errores_hacienda.observaciones) &&
+                  dte.errores_hacienda.observaciones.length > 0 && (
+                    <ul className="text-xs text-red-500 mt-1 list-disc pl-4">
+                      {dte.errores_hacienda.observaciones.map((obs, i) => (
+                        <li key={i}>
+                          {typeof obs === 'string'
+                            ? obs
+                            : obs?.descripcion ?? JSON.stringify(obs)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
               </div>
             )}
           </div>

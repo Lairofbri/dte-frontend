@@ -1,5 +1,6 @@
 // src/pages/Establecimientos.jsx
 // Gestión de establecimientos/sucursales — solo administradores
+// Fase 3: muestra estado fiscal del vínculo POS ↔ DTE, branch_id y sync_error.
 
 import { useState }               from 'react';
 import { Plus, Pencil, PowerOff } from 'lucide-react';
@@ -10,6 +11,15 @@ import Table                      from '../components/ui/Table';
 import Button                     from '../components/ui/Button';
 import Spinner                    from '../components/ui/Spinner';
 import Modal                      from '../components/ui/Modal';
+
+// Estados fiscales del vínculo POS ↔ DTE (spec §5)
+const INFO_ESTADO_FISCAL = {
+  ready:          { label: 'Listo',        variant: 'green'  },
+  pending_mh_data: { label: 'Faltan datos MH', variant: 'yellow' },
+  pending_link:   { label: 'Sin vínculo',  variant: 'gray'   },
+  inactive:       { label: 'Inactivo',     variant: 'gray'   },
+  blocked:        { label: 'Bloqueado',    variant: 'red'    },
+};
 
 const Establecimientos = () => {
   const {
@@ -54,7 +64,12 @@ const Establecimientos = () => {
       render: (valor, fila) => (
         <div>
           <p className="text-sm font-medium text-gray-800">{valor}</p>
-          <p className="text-xs text-gray-400 font-mono">{fila.cod_estable_mh}</p>
+          <p className="text-xs text-gray-400 font-mono">{fila.cod_estable_mh ?? '—'}</p>
+          {fila.branch_id && (
+            <p className="text-xs text-gray-300 font-mono" title="branch_id compartido POS ↔ DTE">
+              {fila.branch_id}
+            </p>
+          )}
         </div>
       ),
     },
@@ -74,6 +89,26 @@ const Establecimientos = () => {
           {valor ?? '—'}
         </span>
       ),
+    },
+    {
+      key:    'fiscal_status',
+      header: 'Estado fiscal',
+      render: (valor, fila) => {
+        const info = INFO_ESTADO_FISCAL[valor] ?? { label: valor, variant: 'gray' };
+        return (
+          <div>
+            <BadgeGenerico variant={info.variant}>{info.label}</BadgeGenerico>
+            {valor === 'blocked' && (
+              <p
+                className="text-xs text-red-400 mt-1 max-w-[220px] truncate"
+                title={fila.sync_error ? `sync_error: ${fila.sync_error}` : undefined}
+              >
+                {fila.sync_error || 'Vínculo o configuración con error'}
+              </p>
+            )}
+          </div>
+        );
+      },
     },
     {
       key:    'activo',

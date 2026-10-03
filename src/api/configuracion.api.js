@@ -26,3 +26,21 @@ export const testFirmadorApi = async () => {
   const { data } = await api.get('/api/firmador/estado');
   return data.data;
 };
+
+/**
+ * Probar conexión con Hacienda usando las credenciales guardadas.
+ * El backend NUNCA devuelve el token — solo confirma la conexión.
+ */
+export const testHaciendaApi = async () => {
+  const { data } = await api.post('/api/configuracion/test-hacienda');
+  return data.data;
+};
+
+/**
+ * Estado de certificado/firma por tenant (Fase 4).
+ * Señales operativas — nunca contraseñas ni certificados.
+ */
+export const obtenerEstadoFirmaApi = async () => {
+  const { data } = await api.get('/api/configuracion/estado-firma');
+  return data.data;
+};
