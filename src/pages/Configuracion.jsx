@@ -18,6 +18,7 @@ import {
 import {
   obtenerConfiguracionApi,
   actualizarConfiguracionApi,
+  actualizarPasswordFirmaApi,
   testFirmadorApi,
   testHaciendaApi,
   obtenerEstadoFirmaApi,
@@ -58,9 +59,12 @@ const configuracionSchema = z.object({
 
 // Credenciales Hacienda: sin restricciones de formato — la validez la
 // verifica Hacienda al probar la conexión. Password vacío = no cambiar.
+// password_firma: contraseña del certificado (passwordPri) POR TENANT —
+// se guarda cifrada en BD, vacío = no cambiar, nunca se devuelve.
 const credencialesSchema = z.object({
   usuario_hacienda:  z.string().optional(),
   password_hacienda: z.string().optional(),
+  password_firma:    z.string().optional(),
 });
 
 // ─────────────────────────────────────────────
@@ -255,6 +259,7 @@ const Configuracion = () => {
           resetCredenciales({
             usuario_hacienda:  '',
             password_hacienda: '',  // NUNCA pre-rellenar — el backend no lo devuelve
+            password_firma:    '',  // NUNCA pre-rellenar — el backend no lo devuelve
           });
           setEsProduccion(config.ambiente === '01');
         }
@@ -342,6 +347,8 @@ const Configuracion = () => {
   // ── Guardar credenciales de Hacienda ──
   // Sin restricciones de formato: la validez la verifica Hacienda al
   // probar la conexión. Password vacío = no cambiar.
+  // password_firma: contraseña del certificado (passwordPri) POR TENANT,
+  // se guarda CIFRADA en BD vía endpoint dedicado. Vacío = no cambiar.
   const onSubmitCredenciales = async (datos) => {
     setIsSavingCreds(true);
     try {
@@ -350,9 +357,19 @@ const Configuracion = () => {
         delete payload.password_hacienda;
       }
       await actualizarConfiguracionApi(payload);
-      toast.success('Credenciales de Hacienda guardadas correctamente.');
-      // Limpiar password después de guardar — NUNCA dejarlo visible en el formulario
-      resetCredenciales({ usuario_hacienda: datos.usuario_hacienda ?? '', password_hacienda: '' });
+      if (datos.password_firma?.trim()) {
+        await actualizarPasswordFirmaApi({ password_firma: datos.password_firma });
+      }
+      toast.success('Credenciales guardadas correctamente.');
+      // Limpiar passwords después de guardar — NUNCA dejarlos visibles en el formulario
+      resetCredenciales({ usuario_hacienda: datos.usuario_hacienda ?? '', password_hacienda: '', password_firma: '' });
+      // Refrescar el estado de firma (credencial_firma_disponible) en el rail derecho
+      try {
+        const firma = await obtenerEstadoFirmaApi();
+        setEstadoFirma(firma);
+      } catch {
+        // el rail se mantiene con el estado previo si falla el refresh
+      }
     } catch (err) {
       const mensaje = err.response?.data?.mensaje || 'No se pudieron guardar las credenciales.';
       toast.error(mensaje);
@@ -714,6 +731,45 @@ const Configuracion = () => {
                   <p className="text-xs text-muted-foreground">
                     Guarda primero las credenciales y luego prueba la conexión.
                   </p>
+                </div>
+
+                {/* Contraseña de firma (passwordPri) — POR TENANT, cifrada en BD.
+                    Es la contraseña de la llave privada del certificado de firma
+                    (firmador remoto). Cada empresa carga la suya; el sistema la
+                    usa al firmar DTEs (emisiones manuales, POS y cron). */}
+                <div className="sm:col-span-2 mt-2 border-t pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="password_firma">
+                      Contraseña de firma (passwordPri)
+                      <span className="ml-1 font-normal text-muted-foreground">(vacío = no cambiar)</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="password_firma"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                        className="pr-10"
+                        {...registerCredenciales('password_firma')}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showPassword
+                          ? <EyeOff className="w-4 h-4" aria-hidden="true" />
+                          : <Eye    className="w-4 h-4" aria-hidden="true" />
+                        }
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Contraseña de la llave privada del certificado de firma. Se guarda
+                      encriptada (por empresa) y se usa automáticamente al firmar DTEs
+                      — incluidas las emisiones automáticas del POS.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Prueba de autenticación Hacienda (Fase 4) */}

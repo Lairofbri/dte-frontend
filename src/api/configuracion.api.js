@@ -44,3 +44,13 @@ export const obtenerEstadoFirmaApi = async () => {
   const { data } = await api.get('/api/configuracion/estado-firma');
   return data.data;
 };
+
+/**
+ * Guardar (cifrada) o limpiar la contraseña de firma del certificado.
+ * POR TENANT — cada empresa carga la suya. El backend NUNCA la devuelve.
+ * Empty string = no cambia (patrón igual a password_hacienda).
+ */
+export const actualizarPasswordFirmaApi = async ({ password_firma }) => {
+  const { data } = await api.put('/api/configuracion/password-firma', { password_firma });
+  return data.data;
+};
