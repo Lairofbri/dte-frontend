@@ -65,10 +65,13 @@ const configuracionSchema = z.object({
 // verifica Hacienda al probar la conexión. Password vacío = no cambiar.
 // password_firma: contraseña del certificado (passwordPri) POR TENANT —
 // se guarda cifrada en BD, vacío = no cambiar, nunca se devuelve.
+// ambiente: 00 pruebas ↔ 01 producción — define contra qué API del MH se
+// autentica y se transmite; cambiarlo invalida el token cacheado.
 const credencialesSchema = z.object({
   usuario_hacienda:  z.string().optional(),
   password_hacienda: z.string().optional(),
   password_firma:    z.string().optional(),
+  ambiente:          z.enum(['00', '01']),
 });
 
 // ─────────────────────────────────────────────
@@ -264,6 +267,7 @@ const Configuracion = () => {
             usuario_hacienda:  '',
             password_hacienda: '',  // NUNCA pre-rellenar — el backend no lo devuelve
             password_firma:    '',  // NUNCA pre-rellenar — el backend no lo devuelve
+            ambiente:          config.ambiente ?? '00',
           });
           setEsProduccion(config.ambiente === '01');
         }
@@ -370,7 +374,14 @@ const Configuracion = () => {
       }
       toast.success('Credenciales guardadas correctamente.');
       // Limpiar passwords después de guardar — NUNCA dejarlos visibles en el formulario
-      resetCredenciales({ usuario_hacienda: datos.usuario_hacienda ?? '', password_hacienda: '', password_firma: '' });
+      resetCredenciales({
+        usuario_hacienda: datos.usuario_hacienda ?? '',
+        password_hacienda: '',
+        password_firma:    '',
+        ambiente:          datos.ambiente,
+      });
+      // Refrescar el badge de ambiente (rail derecho) y el banner de producción
+      setEsProduccion(datos.ambiente === '01');
       // Refrescar el estado de firma (credencial_firma_disponible) en el rail derecho
       try {
         const firma = await obtenerEstadoFirmaApi();
@@ -698,6 +709,26 @@ const Configuracion = () => {
                   Son independientes de la API Key técnica de integración POS ↔ DTE (ver rail derecho).
                 </p>
 
+                {/* Ambiente (00 pruebas ↔ 01 producción) — se autentica y
+                    transmite contra la API correspondiente; al cambiarlo se
+                    invalida el token de Hacienda cacheado. */}
+                <div className="space-y-2">
+                  <Label htmlFor="ambiente_hacienda">Ambiente de Hacienda</Label>
+                  <select
+                    id="ambiente_hacienda"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    {...registerCredenciales('ambiente')}
+                  >
+                    <option value="00">00 — Pruebas (sin validez fiscal)</option>
+                    <option value="01">01 — Producción (validez legal)</option>
+                  </select>
+                  {errorsCredenciales.ambiente && <p className="text-xs text-destructive" role="alert">{errorsCredenciales.ambiente.message}</p>}
+                  <p className="text-xs text-muted-foreground">
+                    Define contra qué API del MH se autentica y se transmite.
+                    Los correlativos se llevan por separado en cada ambiente.
+                  </p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="usuario_hacienda">Usuario Hacienda</Label>
                   <Input
@@ -840,7 +871,7 @@ const Configuracion = () => {
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="text-sm font-medium text-foreground">Ambiente</p>
-                  <p className="text-xs text-muted-foreground">Configurado en el servidor</p>
+                  <p className="text-xs text-muted-foreground">Editable en Credenciales Hacienda</p>
                 </div>
                 <Badge variant={esProduccion ? 'destructive' : 'outline'}>
                   {esProduccion ? 'PRODUCCIÓN' : 'PRUEBAS'}
