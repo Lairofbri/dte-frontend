@@ -65,8 +65,9 @@ const router = createBrowserRouter([
         element: <AdminRoute><Usuarios /></AdminRoute>,
       },
       {
+        // Mantenimiento "Crear empresa": SOLO rol plataforma (2026-10-07).
         path:    'onboarding',
-        element: <AdminRoute><Onboarding /></AdminRoute>,
+        element: <AdminRoute permitir={['plataforma']}><Onboarding /></AdminRoute>,
       },
       {
         path:    'clientes',

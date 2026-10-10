@@ -10,7 +10,7 @@ import {
   Settings, Building2, Users, ClipboardList, UserSquare2,
   Rocket, ChevronLeft, ChevronRight, ChevronDown,
 } from 'lucide-react';
-import { useAuthStore, selectEsAdmin, selectUsuario } from '../../store/auth.store';
+import { useAuthStore, selectEsAdmin, selectEsPlataforma, selectUsuario } from '../../store/auth.store';
 
 // ── Datos estáticos de menú ──
 const menuPrincipal = [
@@ -24,11 +24,14 @@ const dteSubmenu = [
   { label: 'Emitir',  path: '/dtes/emitir' },
 ];
 
+// NOTA (2026-10-07): "Onboarding / Crear empresa" es SOLO para rol plataforma.
+// Un administrador ve todo lo demás (Configuración, Establecimientos,
+// Usuarios, Auditoría) excepto este mantenimiento.
 const menuAdministracion = [
   { label: 'Configuración',    path: '/configuracion',    icon: Settings      },
   { label: 'Establecimientos', path: '/establecimientos', icon: Building2     },
   { label: 'Usuarios',         path: '/usuarios',         icon: Users         },
-  { label: 'Onboarding',       path: '/onboarding',       icon: Rocket        },
+  { label: 'Onboarding',       path: '/onboarding',       icon: Rocket, plataforma: true },
   { label: 'Auditoría',        path: '/auditoria',        icon: ClipboardList },
 ];
 
@@ -128,6 +131,7 @@ const SectionHeader = ({ label, abierto, onToggle }) => (
 const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
   const usuario = useAuthStore(selectUsuario);
   const esAdmin  = useAuthStore(selectEsAdmin);
+  const esPlataforma = useAuthStore(selectEsPlataforma);
 
   const [principalAbierto, setPrincipalAbierto] = useState(true);
   const [adminAbierto,     setAdminAbierto]     = useState(true);
@@ -234,8 +238,8 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
             </>
           ) : null}
 
-          {/* ========== ADMINISTRACIÓN (solo admin) ========== */}
-          {esAdmin ? (
+          {/* ========== ADMINISTRACIÓN (admin o plataforma) ========== */}
+          {esAdmin || esPlataforma ? (
             <>
               {!esColapsado ? (
                 <SectionHeader
@@ -250,14 +254,16 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
               )}
 
               {adminAbierto || esColapsado ? (
-                menuAdministracion.map((item) => (
-                  <SidebarLink
-                    key={item.path}
-                    item={item}
-                    esColapsado={esColapsado}
-                    onClose={onClose}
-                  />
-                ))
+                menuAdministracion
+                  .filter((item) => !item.plataforma || esPlataforma)
+                  .map((item) => (
+                    <SidebarLink
+                      key={item.path}
+                      item={item}
+                      esColapsado={esColapsado}
+                      onClose={onClose}
+                    />
+                  ))
               ) : null}
             </>
           ) : null}

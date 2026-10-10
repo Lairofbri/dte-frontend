@@ -62,9 +62,23 @@ const Login = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const empresaUnica = tenants.length === 1 ? tenants[0] : null;
+const empresaUnica = tenants.length === 1 ? tenants[0] : null;
   const tenantSeleccionado = tenantId || empresaUnica?.id || '';
   const empresaSeleccionada = tenants.find((tenant) => tenant.id === tenantSeleccionado);
+
+  // Nombre que aparece al iniciar sesión: comercial si existe, si no la razón social.
+  const nombreSesion = (tenant) => tenant.nombre_comercial || tenant.nombre;
+
+  // Badge de estado de provisión (2026-10-07): el selector de empresa se
+  // alimenta del estado fiscal real de cada tenant (GET /api/tenants).
+  const INFO_PROVISION = {
+    provisioning:        { label: 'Provisionando',          variant: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+    pending_fiscal_setup: { label: 'Config. fiscal pendiente', variant: 'bg-blue-50 text-blue-700 border-blue-200' },
+    active:              { label: 'Activa',                 variant: 'bg-green-50 text-green-700 border-green-200' },
+    blocked:             { label: 'Bloqueada',              variant: 'bg-red-50 text-red-700 border-red-200' },
+    failed:              { label: 'Fallida',                variant: 'bg-red-50 text-red-700 border-red-200' },
+  };
+  const infoProvision = INFO_PROVISION[empresaSeleccionada?.provisioning_status] ?? null;
 
   const onSubmit = async (datos) => {
     setErrorGeneral('');
@@ -137,7 +151,7 @@ const Login = () => {
                         <Building2 className="h-4 w-4 text-primary-600" aria-hidden="true" />
                         Empresa
                       </label>
-                      <select
+<select
                         id="tenant_id"
                         value={tenantSeleccionado}
                         onChange={(event) => {
@@ -149,9 +163,17 @@ const Login = () => {
                       >
                         <option value="">Seleccionar empresa...</option>
                         {tenants.map((tenant) => (
-                          <option key={tenant.id} value={tenant.id}>{tenant.nombre}</option>
+                          <option key={tenant.id} value={tenant.id}>{nombreSesion(tenant)}</option>
                         ))}
                       </select>
+                      {infoProvision ? (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="text-[11px] font-medium text-gray-500">Estado fiscal:</span>
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${infoProvision.variant}`}>
+                            {infoProvision.label}
+                          </span>
+                        </div>
+                      ) : null}
                     </>
                   ) : (
                     <div className="flex items-center gap-3 rounded-lg border border-primary-100 bg-primary-50/60 px-3 py-2.5">
@@ -160,7 +182,15 @@ const Login = () => {
                       </div>
                       <div className="min-w-0">
                         <p className="text-[11px] font-medium uppercase tracking-wide text-primary-700">Empresa</p>
-                        <p className="truncate text-sm font-medium text-gray-800">{empresaSeleccionada?.nombre || 'Sin empresas activas'}</p>
+                        <p className="truncate text-sm font-medium text-gray-800">{nombreSesion(empresaSeleccionada) || 'Sin empresas activas'}</p>
+                        {empresaSeleccionada?.nombre && empresaSeleccionada.nombre !== nombreSesion(empresaSeleccionada) ? (
+                          <p className="truncate text-xs text-gray-500">{empresaSeleccionada.nombre}</p>
+                        ) : null}
+                        {infoProvision ? (
+                          <span className={`mt-1 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${infoProvision.variant}`}>
+                            {infoProvision.label}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   )}

@@ -54,6 +54,10 @@ const configuracionSchema = z.object({
   email:            z.string().email('Email inválido.').optional().or(z.literal('')),
   correo:           z.string().email('Correo inválido.').optional().or(z.literal('')),
   codigo_actividad: z.string().min(1, 'El código de actividad es requerido.'),
+  // Debe estar en el schema (aunque sea readOnly): si falta, zod lo elimina
+  // del objeto resuelto y `reset` tras guardar deja isDirty=true para siempre
+  // ("Cambios sin guardar" permanente).
+  desc_actividad:   z.string().optional(),
   tipo_establecimiento: z.string().min(1, 'El tipo de establecimiento es requerido.'),
 });
 
@@ -353,6 +357,10 @@ const Configuracion = () => {
     setIsSavingCreds(true);
     try {
       const payload = { ...datos };
+      // password_firma se guarda por su ENDPOINT DEDICADO (PUT
+      // /api/configuracion/password-firma, cifrada por tenant); el schema del
+      // PATCH lo rechaza con 400 — nunca debe viajar en este payload.
+      delete payload.password_firma;
       if (!payload.password_hacienda?.trim()) {
         delete payload.password_hacienda;
       }

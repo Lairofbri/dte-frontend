@@ -16,3 +16,17 @@ export const crearTenantPlataformaApi = async (datos) => {
   const { data } = await api.post('/api/provisioning/tenants', datos);
   return data.data;
 };
+
+// PATCH /api/provisioning/tenants/:tenantId — editar datos de la empresa
+// (rol plataforma). El NIT es inmutable: no se envía.
+export const actualizarTenantPlataformaApi = async (tenantId, datos) => {
+  const { data } = await api.patch(`/api/provisioning/tenants/${tenantId}`, datos);
+  return data.data;
+};
+
+// PATCH /api/provisioning/tenants/:tenantId/admin — editar el administrador
+// inicial del tenant (rol plataforma). Password vacío = no cambia.
+export const actualizarAdminTenantPlataformaApi = async (tenantId, datos) => {
+  const { data } = await api.patch(`/api/provisioning/tenants/${tenantId}/admin`, datos);
+  return data.data;
+};
