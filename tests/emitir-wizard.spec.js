@@ -58,8 +58,10 @@ test.describe('DTE — Wizard de emisión', () => {
     await page.getByRole('button', { name: /Consumidor final/ }).first().click();
     await page.getByRole('button', { name: /Continuar/ }).click();
 
-    // Paso 3 → ítems: descripción, cantidad y precio
-    await page.getByLabel('Descripción').fill('Producto de prueba E2E');
+    // Paso 3 → ítems: descripción desde el listado de productos, cantidad y precio
+    await page.getByLabel('Descripción').click();
+    await page.getByPlaceholder('Buscar producto o código...').fill('Producto de prueba E2E');
+    await page.getByRole('option', { name: /Usar «Producto de prueba E2E» como descripción/ }).click();
     await page.getByLabel('Precio').fill('10.00');
     await expect(page.getByText('$10.00', { exact: false }).first()).toBeVisible();
 

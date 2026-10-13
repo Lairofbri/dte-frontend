@@ -5,7 +5,6 @@
 
 import { Plus, Trash2, ChevronDown, Package } from 'lucide-react';
 import { Controller } from 'react-hook-form';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/shadcn/button';
 import { Input } from '@/components/shadcn/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/shadcn/select';
@@ -31,9 +30,24 @@ const InputMoneda = ({ ...props }) => (
   </div>
 );
 
-const ItemRow = ({ idx, item, register, errors, control, tiposItem, unidades, esFSE, onRemove, puedeRemover }) => {
+const ItemRow = ({ idx, item, register, errors, control, setValue, tiposItem, unidades, esFSE, onRemove, puedeRemover }) => {
   const errorDescripcion = errors.items?.[idx]?.descripcion;
   const importe = (Number(item?.cantidad) || 0) * (Number(item?.precio_unitario) || 0);
+
+  // Precarga el ítem completo desde un producto del catálogo: el resto del
+  // ítem (código, tipo, unidad, precio, tratamiento fiscal) sigue al producto.
+  // La cantidad queda en 1 y es ajustable; el importe de ventas no sujetas/
+  // exentas se precarga si el producto es no_sujeta o exenta.
+  const aplicarProducto = (idxCampo, producto, fieldDescripcion) => {
+    const sub = Number(producto.precio_unitario) || 0;
+    fieldDescripcion.onChange(producto.nombre);
+    setValue(`items.${idxCampo}.codigo`,         producto.codigo ?? '');
+    setValue(`items.${idxCampo}.tipo_item`,      String(producto.tipo_item));
+    setValue(`items.${idxCampo}.uni_medida`,     String(producto.uni_medida));
+    setValue(`items.${idxCampo}.precio_unitario`, sub);
+    setValue(`items.${idxCampo}.venta_no_suj`,   producto.tipo_venta === 'no_sujeta' ? sub : 0);
+    setValue(`items.${idxCampo}.venta_exenta`,   producto.tipo_venta === 'exenta'    ? sub : 0);
+  };
 
   return (
     <div className="rounded-xl border bg-white p-4 shadow-card">
@@ -65,12 +79,19 @@ const ItemRow = ({ idx, item, register, errors, control, tiposItem, unidades, es
             error={errorDescripcion?.message}
             htmlFor={`item-${idx}-desc`}
           >
-            <Input
-              id={`item-${idx}-desc`}
-              placeholder="Descripción del producto o servicio"
-              className={cn(errorDescripcion && 'border-destructive')}
-              aria-invalid={!!errorDescripcion}
-              {...register(`items.${idx}.descripcion`)}
+            <Controller
+              name={`items.${idx}.descripcion`}
+              control={control}
+              render={({ field }) => (
+                <SelectorProducto
+                  id={`item-${idx}-desc`}
+                  value={field.value ?? ''}
+                  error={!!errorDescripcion}
+                  placeholder="Seleccionar producto del catálogo…"
+                  onSeleccionar={(p) => aplicarProducto(idx, p, field)}
+                  onManual={(texto) => field.onChange(texto)}
+                />
+              )}
             />
           </FormField>
         </div>
@@ -195,28 +216,10 @@ const ItemRow = ({ idx, item, register, errors, control, tiposItem, unidades, es
 };
 
 const Paso3Items = ({
-  register, errors, control,
+  register, errors, control, setValue,
   itemFields, appendItem, removeItem, itemsActuales,
   tiposItem, unidades, esFSE, tipoDte, totales,
 }) => {
-  // Autocompleta un ítem desde un producto del catálogo (Fase 3).
-  // El subtotal inicial = cantidad (1) × precio del momento; si el producto es
-  // no sujeto/exento, ese importe se precarga en venta_no_suj/venta_exenta
-  // (ajustable luego en "Opciones fiscales").
-  const agregarProducto = (p) => {
-    const subInicial = Number(p.precio_unitario) || 0;
-    appendItem({
-      ...ITEM_VACIO,
-      descripcion:     p.nombre,
-      codigo:          p.codigo || '',
-      tipo_item:       String(p.tipo_item),
-      uni_medida:      String(p.uni_medida),
-      precio_unitario: subInicial,
-      venta_no_suj:    p.tipo_venta === 'no_sujeta' ? subInicial : 0,
-      venta_exenta:    p.tipo_venta === 'exenta'    ? subInicial : 0,
-    });
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -227,8 +230,6 @@ const Paso3Items = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {/* Selector de productos del catálogo (búsqueda server-side) */}
-          <SelectorProducto onSeleccionar={agregarProducto} />
           <Button type="button" onClick={() => appendItem({ ...ITEM_VACIO })}>
             <Plus className="size-4" data-icon="inline-start" />
             Agregar ítem
@@ -248,6 +249,7 @@ const Paso3Items = ({
           register={register}
           errors={errors}
           control={control}
+          setValue={setValue}
           tiposItem={tiposItem}
           unidades={unidades}
           esFSE={esFSE}

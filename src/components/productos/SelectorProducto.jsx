@@ -1,10 +1,14 @@
 // src/components/productos/SelectorProducto.jsx
-// Selector de productos con búsqueda server-side (listarProductosApi + debounce 350ms).
-// Reutiliza shadcn Popover + Command (patrón de components/shadcn/combobox.jsx).
-// La carga es lazy: solo consulta la BD al abrir el popover.
+// Combobox "tipo input" que lista los productos del catálogo (búsqueda server-side,
+// debounce 350 ms). Vive en el campo Descripción de cada ítem del wizard:
+// - al elegir un producto, onSeleccionar(producto) devuelve el producto completo
+//   para precargar código, tipo, unidad, precio y tratamiento fiscal;
+// - si el texto tipeado no está en el catálogo, onManual(texto) guarda la
+//   descripción libre (producto no registrado).
+// Carga lazy: solo consulta la BD al abrir el popover.
 
 import { useEffect, useRef, useState } from 'react';
-import { Package } from 'lucide-react';
+import { ChevronDown, Package } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/shadcn/button';
@@ -17,9 +21,13 @@ import {
 import { listarProductosApi } from '../../api/productos.api';
 
 const SelectorProducto = ({
+  id,
+  value = '',
   onSeleccionar,
+  onManual,
+  placeholder = 'Seleccionar producto del catálogo…',
   disabled = false,
-  label = 'Agregar producto',
+  error = false,
   className,
 }) => {
   const [abierto,   setAbierto]   = useState(false);
@@ -50,26 +58,55 @@ const SelectorProducto = ({
     return () => clearTimeout(timer);
   }, [abierto, busqueda]);
 
-  const seleccionar = (producto) => {
+  const cerrar = () => {
     setAbierto(false);
     setBusqueda('');
+  };
+
+  const seleccionar = (producto) => {
+    cerrar();
     onSeleccionar?.(producto);
+  };
+
+  const aplicarManual = () => {
+    if (!busqueda.trim()) return;
+    const texto = busqueda.trim();
+    cerrar();
+    onManual?.(texto);
+  };
+
+  const limpiar = () => {
+    cerrar();
+    onManual?.('');
   };
 
   return (
     <Popover open={abierto} onOpenChange={setAbierto}>
       <PopoverTrigger asChild>
         <Button
+          id={id}
           type="button"
           variant="outline"
+          role="combobox"
+          aria-expanded={abierto}
           disabled={disabled}
-          className={cn(className)}
+          className={cn(
+            'h-10 w-full justify-between border-input bg-background px-3 text-left font-normal',
+            error && 'border-destructive',
+            className,
+          )}
         >
-          <Package className="size-4" data-icon="inline-start" />
-          {label}
+          <span className="truncate text-sm">
+            {value ? (
+              <span className="text-foreground">{value}</span>
+            ) : (
+              <span className="text-muted-foreground">{placeholder}</span>
+            )}
+          </span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-72 p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="Buscar producto o código..."
@@ -77,10 +114,21 @@ const SelectorProducto = ({
             onValueChange={setBusqueda}
           />
           <CommandList>
-            <CommandEmpty>
-              {cargando ? 'Buscando...' : 'Sin productos — créalo en la página Productos'}
-            </CommandEmpty>
-            <CommandGroup>
+            {busqueda.trim() && (
+              <CommandGroup heading="Sin resultados en el catálogo">
+                <CommandItem
+                  value="__manual__"
+                  onSelect={aplicarManual}
+                >
+                  <Package className="size-4 text-muted-foreground" aria-hidden="true" />
+                  Usar «{busqueda.trim()}» como descripción
+                </CommandItem>
+              </CommandGroup>
+            )}
+
+            <CommandEmpty>{cargando ? 'Buscando...' : 'Sin productos en el catálogo'}</CommandEmpty>
+
+            <CommandGroup heading="Catálogo">
               {productos.map((p) => (
                 <CommandItem
                   key={p.id}
@@ -96,6 +144,14 @@ const SelectorProducto = ({
                 </CommandItem>
               ))}
             </CommandGroup>
+
+            {value && (
+              <CommandGroup>
+                <CommandItem value="__limpiar__" onSelect={limpiar}>
+                  <span className="text-destructive">Limpiar descripción</span>
+                </CommandItem>
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

@@ -397,6 +397,7 @@ const DTEEmitir = () => {
                   register={register}
                   errors={errors}
                   control={control}
+                  setValue={setValue}
                   itemFields={itemFields}
                   appendItem={appendItem}
                   removeItem={removeItem}
