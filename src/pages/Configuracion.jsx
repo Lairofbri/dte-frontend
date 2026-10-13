@@ -63,12 +63,13 @@ const configuracionSchema = z.object({
 
 // Credenciales Hacienda: sin restricciones de formato — la validez la
 // verifica Hacienda al probar la conexión. Password vacío = no cambiar.
+// El USUARIO de la API es el NIT del emisor (se toma de «Datos del emisor»,
+// no se edita aquí — el MH autentica al usuario de aplicación con el NIT).
 // password_firma: contraseña del certificado (passwordPri) POR TENANT —
 // se guarda cifrada en BD, vacío = no cambiar, nunca se devuelve.
 // ambiente: 00 pruebas ↔ 01 producción — define contra qué API del MH se
-// autentica y se transmite; cambiarlo invalida el token cacheado.
+// autentica y se transmite POR EMPRESA; cambiarlo invalida el token cacheado.
 const credencialesSchema = z.object({
-  usuario_hacienda:  z.string().optional(),
   password_hacienda: z.string().optional(),
   password_firma:    z.string().optional(),
   ambiente:          z.enum(['00', '01']),
@@ -101,6 +102,8 @@ const EstadoConexion = ({ estado }) => {
 
 // Indicador de la prueba de conexión con Hacienda (Fase 4).
 // El backend NUNCA devuelve el token — solo el resultado de la conexión.
+// Cuando falla, el motivo accionable llega en estado.mensaje (traducido del
+// código del MH) y se muestra debajo del botón, no acá (lugar compacto).
 const EstadoHacienda = ({ estado }) => {
   if (estado === null) return null;
   if (estado === 'probando') return (
@@ -117,9 +120,12 @@ const EstadoHacienda = ({ estado }) => {
     </span>
   );
   return (
-    <span className="flex items-center gap-1.5 text-xs text-red-500 font-medium">
+    <span
+      className="flex items-center gap-1.5 text-xs text-red-500 font-medium"
+      title={estado.mensaje || undefined}
+    >
       <XCircle className="w-3.5 h-3.5" aria-hidden="true" />
-      Error de conexión
+      Sin conexión
     </span>
   );
 };
@@ -172,6 +178,9 @@ const Configuracion = () => {
   const [isSavingDatos,    setIsSavingDatos]    = useState(false);
   const [isSavingCreds,    setIsSavingCreds]    = useState(false);
   const [showPassword,     setShowPassword]     = useState(false);
+  // NIT del emisor (con máscara) — es el usuario de la API de Hacienda.
+  // Se toma de «Datos del emisor»; la card de credenciales solo lo muestra.
+  const [nitEmisor,        setNitEmisor]        = useState('');
   const [estadoFirmador,   setEstadoFirmador]   = useState(null);
   const [estadoHacienda,   setEstadoHacienda]   = useState(null);
   const [estadoFirma,      setEstadoFirma]      = useState(null);
@@ -264,11 +273,12 @@ const Configuracion = () => {
             tipo_establecimiento: config.tipo_establecimiento ?? '02',
           });
           resetCredenciales({
-            usuario_hacienda:  '',
             password_hacienda: '',  // NUNCA pre-rellenar — el backend no lo devuelve
             password_firma:    '',  // NUNCA pre-rellenar — el backend no lo devuelve
             ambiente:          config.ambiente ?? '00',
           });
+          // El usuario de la API de Hacienda es el NIT del emisor (Datos del emisor)
+          setNitEmisor(aplicarMascara('nit', config.nit));
           setEsProduccion(config.ambiente === '01');
         }
       } catch {
@@ -368,6 +378,10 @@ const Configuracion = () => {
       if (!payload.password_hacienda?.trim()) {
         delete payload.password_hacienda;
       }
+      // El usuario de la API de Hacienda es el NIT del emisor (sin guiones) —
+      // se toma de «Datos del emisor» y se re-afirma en cada guardado, para
+      // que un NIT corregido allí quede sincronizado automáticamente.
+      payload.usuario_hacienda = limpiarFormato(nitEmisor);
       await actualizarConfiguracionApi(payload);
       if (datos.password_firma?.trim()) {
         await actualizarPasswordFirmaApi({ password_firma: datos.password_firma });
@@ -375,7 +389,6 @@ const Configuracion = () => {
       toast.success('Credenciales guardadas correctamente.');
       // Limpiar passwords después de guardar — NUNCA dejarlos visibles en el formulario
       resetCredenciales({
-        usuario_hacienda: datos.usuario_hacienda ?? '',
         password_hacienda: '',
         password_firma:    '',
         ambiente:          datos.ambiente,
@@ -415,8 +428,13 @@ const Configuracion = () => {
     try {
       const resultado = await testHaciendaApi();
       setEstadoHacienda({ ok: true, ambiente: resultado?.ambiente });
-    } catch {
-      setEstadoHacienda({ ok: false });
+    } catch (err) {
+      // El backend traduce el motivo real del MH (código 101/106/103...):
+      // mostrarlo en la UI en vez de un genérico.
+      setEstadoHacienda({
+        ok: false,
+        mensaje: err.response?.data?.mensaje || 'No se pudo probar la conexión con Hacienda.',
+      });
     }
   };
 
@@ -705,8 +723,10 @@ const Configuracion = () => {
                 <p className="sm:col-span-2 text-xs text-muted-foreground">
                   Credenciales de acceso a la API del Ministerio de Hacienda (fuente de verdad fiscal).
                   Se guardan encriptadas y el sistema nunca vuelve a mostrarlas.
-                  No se impone formato: <strong>la validez la verifica Hacienda al probar la conexión</strong>.
-                  Son independientes de la API Key técnica de integración POS ↔ DTE (ver rail derecho).
+                  El <strong>usuario de la aplicación es el NIT del emisor</strong> (se toma de
+                  «Datos del emisor») — <strong>solo se carga la contraseña</strong>; la validez la
+                  verifica Hacienda al probar la conexión. Son independientes de la API Key
+                  técnica de integración POS ↔ DTE (ver rail derecho).
                 </p>
 
                 {/* Ambiente (00 pruebas ↔ 01 producción) — se autentica y
@@ -733,12 +753,16 @@ const Configuracion = () => {
                   <Label htmlFor="usuario_hacienda">Usuario Hacienda</Label>
                   <Input
                     id="usuario_hacienda"
-                    type="email"
-                    placeholder="usuario@empresa.com"
-                    className={errorsCredenciales.usuario_hacienda ? 'border-destructive focus-visible:ring-destructive' : ''}
-                    {...registerCredenciales('usuario_hacienda')}
+                    readOnly
+                    value={nitEmisor}
+                    placeholder="0000-000000-000-0"
+                    className="bg-muted/50 font-mono"
                   />
-                  {errorsCredenciales.usuario_hacienda && <p className="text-xs text-destructive" role="alert">{errorsCredenciales.usuario_hacienda.message}</p>}
+                  <p className="text-xs text-muted-foreground">
+                    Usuario de aplicación del MH = <strong>NIT del emisor</strong> (se toma de
+                    «Datos del emisor»; se envía sin guiones). Para cambiarlo, editalo y
+                    guardalo en esa sección.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -812,26 +836,36 @@ const Configuracion = () => {
                 </div>
 
                 {/* Prueba de autenticación Hacienda (Fase 4) */}
-                <div className="sm:col-span-2 flex items-center justify-between gap-3 rounded-lg border bg-gray-50/60 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Conexión con Hacienda</p>
-                    <p className="text-xs text-muted-foreground">
-                      Prueba las credenciales guardadas contra la API del MH (no devuelve el token)
+                <div className="sm:col-span-2 space-y-2 rounded-lg border bg-gray-50/60 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Conexión con Hacienda</p>
+                      <p className="text-xs text-muted-foreground">
+                        Prueba las credenciales guardadas contra la API del MH (no devuelve el token)
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <EstadoHacienda estado={estadoHacienda} />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={probarHacienda}
+                        disabled={estadoHacienda === 'probando'}
+                      >
+                        <Wifi aria-hidden="true" />
+                        Probar
+                      </Button>
+                    </div>
+                  </div>
+                  {isDirtyCredenciales && (
+                    <p className="text-xs text-amber-600" role="alert">
+                      Hay cambios sin guardar: «Probar» usa las credenciales ya guardadas. Guarda primero.
                     </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <EstadoHacienda estado={estadoHacienda} />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={probarHacienda}
-                      disabled={estadoHacienda === 'probando'}
-                    >
-                      <Wifi aria-hidden="true" />
-                      Probar
-                    </Button>
-                  </div>
+                  )}
+                  {estadoHacienda && estadoHacienda !== 'probando' && !estadoHacienda.ok && estadoHacienda.mensaje && (
+                    <p className="text-xs text-red-500" role="alert">{estadoHacienda.mensaje}</p>
+                  )}
                 </div>
 
               </CardContent>
