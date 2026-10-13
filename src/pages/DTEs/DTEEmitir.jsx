@@ -1,116 +1,34 @@
 // src/pages/DTEs/DTEEmitir.jsx
-// Formulario completo para emitir FCF, CCF, FSE, NC y ND
-// Campos según estructura oficial Hacienda El Salvador v2/v3/v4
+// Wizard de emisión de DTEs (FCF, CCF, FSE, NC, ND) en 5 pasos:
+//   1. Tipo de documento → 2. Receptor → 3. Ítems → 4. Pago → 5. Resumen y firma
+// Validación por paso con react-hook-form + zod y totales siempre visibles.
 
-import { useState }               from 'react';
-import { useNavigate }            from 'react-router-dom';
+import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
-import { zodResolver }            from '@hookform/resolvers/zod';
-import { z }                      from 'zod';
-import {
-  Plus, Trash2, ArrowLeft,
-  Eye, EyeOff, Loader2, Lock,
-} from 'lucide-react';
-import { useEmitirDTE, calcularTotales } from '../../hooks/useEmitirDTE';
-import SelectorCliente from '../../components/clientes/SelectorCliente';
-import { formatMonto }            from '../../utils/formatters';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+
+import { Alert, AlertTitle } from '../../components/shadcn/alert';
+import { Button } from '../../components/shadcn/button';
+import { useEmitirDTE } from '../../hooks/useEmitirDTE';
+import { useCatalogosUI } from '../../hooks/useCatalogosUI';
+import { calcularTotales } from '../../components/dtes/emitir/calcularTotales';
+import EmitirStepper from '../../components/dtes/emitir/EmitirStepper';
+import PanelTotales from '../../components/dtes/emitir/PanelTotales';
+import Paso1Tipo from '../../components/dtes/emitir/Paso1Tipo';
+import Paso2Receptor from '../../components/dtes/emitir/Paso2Receptor';
+import Paso3Items, { ITEM_VACIO } from '../../components/dtes/emitir/Paso3Items';
+import Paso4Pago, { PAGO_VACIO } from '../../components/dtes/emitir/Paso4Pago';
+import Paso5Resumen from '../../components/dtes/emitir/Paso5Resumen';
 
 // ─────────────────────────────────────────────
-// CATÁLOGOS
-// ─────────────────────────────────────────────
-const TIPOS_ITEM = [
-  { value: 2, label: 'Servicio (2)' },
-  { value: 1, label: 'Bien (1)' },
-  { value: 3, label: 'Ambos (3)' },
-  { value: 4, label: 'Otro (4)' },
-];
-
-const FORMAS_PAGO = [
-  { value: '01', label: 'Billetes y monedas (01)' },
-  { value: '02', label: 'Tarjeta débito (02)' },
-  { value: '03', label: 'Tarjeta crédito (03)' },
-  { value: '04', label: 'Cheque (04)' },
-  { value: '05', label: 'Transferencia (05)' },
-  { value: '06', label: 'Tarjeta Empresarial (06)' },
-  { value: '07', label: 'Bono (07)' },
-  { value: '08', label: 'Dinero electrónico (08)' },
-  { value: '09', label: 'Monedero electrónico (09)' },
-  { value: '10', label: 'Vales (10)' },
-  { value: '11', label: 'Bitcoin (11)' },
-  { value: '12', label: 'Otras criptomonedas (12)' },
-  { value: '13', label: 'Cuentas por pagar del receptor (13)' },
-  { value: '14', label: 'Giro bancario (14)' },
-  { value: '99', label: 'Otros (99)' },
-];
-
-const TIPOS_DOC = [
-  { value: '13', label: 'DUI (13)' },
-  { value: '36', label: 'NIT (36)' },
-  { value: '03', label: 'Pasaporte (03)' },
-  { value: '02', label: 'Carnet residente (02)' },
-  { value: '37', label: 'Otro (37)' },
-];
-
-const DEPARTAMENTOS = [
-  { cod: '06', nombre: 'San Salvador' },
-  { cod: '05', nombre: 'La Libertad' },
-  { cod: '01', nombre: 'Ahuachapán' },
-  { cod: '02', nombre: 'Santa Ana' },
-  { cod: '03', nombre: 'Sonsonate' },
-  { cod: '04', nombre: 'Chalatenango' },
-  { cod: '07', nombre: 'Cuscatlán' },
-  { cod: '08', nombre: 'La Paz' },
-  { cod: '09', nombre: 'Cabañas' },
-  { cod: '10', nombre: 'San Vicente' },
-  { cod: '11', nombre: 'Usulután' },
-  { cod: '12', nombre: 'San Miguel' },
-  { cod: '13', label: 'Morazán' },
-  { cod: '14', nombre: 'La Unión' },
-];
-
-const PLAZOS = [
-  { value: '01', label: 'Días (01)' },
-  { value: '02', label: 'Meses (02)' },
-  { value: '03', label: 'Años (03)' },
-];
-
-// ─────────────────────────────────────────────
-// NÚMERO A LETRAS (simplificado frontend)
-// ─────────────────────────────────────────────
-const numeroALetras = (monto) => {
-  if (isNaN(monto) || monto <= 0) return '';
-  const entero   = Math.floor(monto);
-  const centavos = Math.round((monto - entero) * 100);
-  const u = ['','UN','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE',
-    'DIEZ','ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISÉIS','DIECISIETE','DIECIOCHO','DIECINUEVE'];
-  const d = ['','','VEINTE','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];
-  const c = ['','CIEN','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS',
-    'SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS'];
-  const v = ['','VEINTIÚN','VEINTIDÓS','VEINTITRÉS','VEINTICUATRO','VEINTICINCO','VEINTISÉIS','VEINTISIETE','VEINTIOCHO','VEINTINUEVE'];
-  const menorMil = (n) => {
-    if (!n) return '';
-    if (n===100) return 'CIEN';
-    if (n<20) return u[n];
-    if (n>=21&&n<=29) return v[n-20];
-    if (n<100) { const dd=Math.floor(n/10),uu=n%10; return uu?`${d[dd]} Y ${u[uu]}`:d[dd]; }
-    const cc=Math.floor(n/100),r=n%100;
-    return r?(cc===1?`CIENTO ${menorMil(r)}`:`${c[cc]} ${menorMil(r)}`):c[cc];
-  };
-  const conv = (n) => {
-    if (!n) return 'CERO';
-    if (n<1000) return menorMil(n);
-    const m=Math.floor(n/1000),r=n%1000;
-    const p=m===1?'MIL':`${menorMil(m)} MIL`;
-    return r?`${p} ${menorMil(r)}`:p;
-  };
-  return `${conv(entero)} ${centavos.toString().padStart(2,'0')}/100 DÓLARES`;
-};
-
-// ─────────────────────────────────────────────
-// SCHEMAS ZOD
+// SCHEMAS ZOD — por tipo de DTE (estructura Hacienda v2/v3/v4)
 // ─────────────────────────────────────────────
 const itemSchema = z.object({
   descripcion:     z.string().min(1, 'Descripción requerida.'),
+  codigo:          z.string().max(25).optional().or(z.literal('')),
   tipo_item:       z.coerce.number().int().min(1).max(4).default(2),
   uni_medida:      z.coerce.number().int().min(1).max(99).default(59),
   cantidad:        z.coerce.number().positive('Debe ser mayor a 0.'),
@@ -138,12 +56,9 @@ const schemaBase = z.object({
   condicion_operacion: z.coerce.number().int().min(1).max(3).default(1),
   items:               z.array(itemSchema).min(1, 'Agrega al menos un ítem.'),
   pagos:               z.array(pagoSchema).min(1, 'Agrega al menos una forma de pago.'),
-  password_pri:        z.string().min(1, 'La contraseña de firma es requerida.'),
-  // Extensión (opcional)
-  ext_nomb_entrega:    z.string().optional().or(z.literal('')),
-  ext_nomb_recibe:     z.string().optional().or(z.literal('')),
-  ext_placa:           z.string().optional().or(z.literal('')),
-  ext_observaciones:   z.string().optional().or(z.literal('')),
+  // NOTA: password_pri no es campo del frontend (firma interna, migración 030).
+  // "extension" tampoco: el esquema oficial MH del DTE no la incluye, y el
+  // backend Joi la rechaza ("... is not allowed").
 });
 
 const schemaFCF = schemaBase.extend({
@@ -203,55 +118,49 @@ const getSchema = (t) => {
   return schemaFCF;
 };
 
-const ITEM_VACIO = {
-  descripcion: '', tipo_item: 2, uni_medida: 59,
-  cantidad: 1, precio_unitario: 0,
-  descuento_pct: 0, venta_no_suj: 0, venta_exenta: 0, compra: 0,
-};
-
-const PAGO_VACIO = { codigo: '01', montoPago: 0, referencia: '', plazo: null, periodo: null };
-
-// ─────────────────────────────────────────────
-// SUBCOMPONENTES
-// ─────────────────────────────────────────────
-const Field = ({ label, req, children, error, note }) => (
-  <div>
-    <label className="label">
-      {label}{req && <span className="text-red-500 ml-1" aria-hidden="true">*</span>}
-    </label>
-    {children}
-    {error && <p className="error-msg" role="alert">{error}</p>}
-    {note  && <p className="text-xs text-gray-400 mt-1">{note}</p>}
+// ── Footer de navegación (pasos 1-4) ──
+const FooterPasos = ({ paso, onIrAPaso, isLoading }) => (
+  <div className="flex items-center justify-between gap-3 border-t pt-4">
+    <Button
+      type="button"
+      variant="ghost"
+      onClick={() => onIrAPaso(paso - 1)}
+      disabled={paso === 1 || isLoading}
+    >
+      <ChevronLeft className="size-4" aria-hidden="true" />
+      Atrás
+    </Button>
+    <Button type="submit" disabled={isLoading}>
+      Continuar
+      <ChevronRight className="size-4" aria-hidden="true" />
+    </Button>
   </div>
 );
 
-const DisabledNote = ({ msg }) => (
-  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-    <Lock className="w-3 h-3" aria-hidden="true" />{msg}
-  </p>
-);
-
-// ─────────────────────────────────────────────
-// COMPONENTE PRINCIPAL
-// ─────────────────────────────────────────────
 const DTEEmitir = () => {
-  const navigate           = useNavigate();
-  const { emitir }         = useEmitirDTE();
+  const navigate = useNavigate();
+  const { emitir } = useEmitirDTE();
+
+  // ── Estado del wizard ──
+  const [paso, setPaso] = useState(1);
+  const [maxPasoAlcanzado, setMaxPasoAlcanzado] = useState(1);
+
   const [isLoading, setIsLoading]     = useState(false);
-  const [showPwd,   setShowPwd]       = useState(false);
   const [tipoDte,   setTipoDte]       = useState('01');
   const [condicion, setCondicion]     = useState(1);
   const [errorApi,  setErrorApi]      = useState('');
   const [clienteId, setClienteId]     = useState(null);
+  const [fcfConDatos, setFcfConDatos] = useState(false);
 
-  const { register, control, handleSubmit, reset, setValue,
+  const { unidades, formasPago, tiposItem, tiposDoc, departamentos, plazos, error: errorCatalogos } = useCatalogosUI();
+
+  const { register, control, handleSubmit, reset, setValue, trigger,
     formState: { errors } } = useForm({
     resolver: zodResolver(getSchema(tipoDte)),
     defaultValues: {
       tipo_dte: '01', condicion_operacion: 1,
       items: [ITEM_VACIO],
       pagos: [{ ...PAGO_VACIO }],
-      password_pri: '',
     },
     mode: 'onChange',
   });
@@ -265,20 +174,93 @@ const DTEEmitir = () => {
   const totales       = calcularTotales(itemsActuales, tipoDte);
   const esCCF         = tipoDte === '03';
   const esFSE         = tipoDte === '14';
-  const esNC          = tipoDte === '05';
-  const esND          = tipoDte === '06';
-  const esNCND        = esNC || esND;
+  const esNCND        = tipoDte === '05' || tipoDte === '06';
 
-  const cambiarTipo = (t) => {
+  const cambiarTipo = useCallback((t) => {
     setTipoDte(t);
-    reset((v) => ({ ...v, tipo_dte: t, password_pri: '' }));
-  };
+    reset((v) => ({ ...v, tipo_dte: t }));
+  }, [reset]);
 
-  const onSubmit = async (datos) => {
+  // ── Validación por paso ──
+  const camposDelPaso = useCallback((p) => {
+    if (p === 1) return [];
+    if (p === 2) {
+      const campos = [];
+      if (tipoDte === '01') {
+        campos.push('rec_nombre', 'rec_tipo_doc', 'rec_num_doc', 'rec_correo', 'rec_telefono');
+      } else {
+        campos.push('rec_nombre', 'rec_nit', 'rec_correo', 'rec_telefono');
+        if (esCCF || esNCND) {
+          campos.push('rec_nrc', 'rec_cod_actividad', 'rec_desc_actividad', 'rec_depto', 'rec_municipio');
+        }
+        if (tipoDte === '14') campos.push('observaciones');
+      }
+      if (esNCND) campos.push('doc_rel_codgen', 'doc_rel_tipo', 'doc_rel_fecha', 'fusion', 'observaciones');
+      return campos;
+    }
+    if (p === 3) return ['items'];
+    if (p === 4) return ['pagos'];
+    return [];
+  }, [tipoDte, esCCF, esNCND]);
+
+  const validarPaso = useCallback(async (p) => {
+    const campos = camposDelPaso(p);
+    if (campos.length === 0) return true;
+    return trigger(campos);
+  }, [camposDelPaso, trigger]);
+
+  const irAPaso = useCallback(async (p) => {
+    if (p > maxPasoAlcanzado) return;
+    setPaso(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [maxPasoAlcanzado]);
+
+  const avanzar = useCallback(async () => {
+    const valido = await validarPaso(paso);
+    if (!valido) return;
+    const siguiente = Math.min(paso + 1, 5);
+    setPaso(siguiente);
+    setMaxPasoAlcanzado((m) => Math.max(m, siguiente));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [paso, validarPaso]);
+
+  // ── Selección de cliente guardado → llena el receptor ──
+  const onSeleccionarCliente = useCallback((receptorCliente, id) => {
+    setClienteId(id || null);
+    if (!receptorCliente) return;
+    if (tipoDte === '01') {
+      if (receptorCliente.nombre)         setValue('rec_nombre', receptorCliente.nombre);
+      if (receptorCliente.tipo_documento) setValue('rec_tipo_doc', receptorCliente.tipo_documento);
+      if (receptorCliente.num_documento)  setValue('rec_num_doc', receptorCliente.num_documento);
+      if (receptorCliente.correo)         setValue('rec_correo', receptorCliente.correo);
+      if (receptorCliente.telefono)       setValue('rec_telefono', receptorCliente.telefono);
+    } else {
+      if (receptorCliente.nombre)          setValue('rec_nombre', receptorCliente.nombre);
+      if (receptorCliente.nit)             setValue('rec_nit', receptorCliente.nit);
+      if (receptorCliente.nrc)             setValue('rec_nrc', receptorCliente.nrc);
+      if (receptorCliente.cod_actividad)   setValue('rec_cod_actividad', receptorCliente.cod_actividad);
+      if (receptorCliente.desc_actividad)  setValue('rec_desc_actividad', receptorCliente.desc_actividad);
+      if (receptorCliente.correo)          setValue('rec_correo', receptorCliente.correo);
+      if (receptorCliente.telefono)        setValue('rec_telefono', receptorCliente.telefono);
+      if (receptorCliente.departamento_cod) setValue('rec_depto', receptorCliente.departamento_cod);
+      if (receptorCliente.municipio_cod)   setValue('rec_municipio', receptorCliente.municipio_cod);
+    }
+  }, [tipoDte, setValue]);
+
+  // FCF: al volver a "Consumidor final" se limpian los datos del receptor
+  const onSetFcfConDatos = useCallback((conDatos) => {
+    setFcfConDatos(conDatos);
+    if (!conDatos) {
+      ['rec_nombre', 'rec_tipo_doc', 'rec_num_doc', 'rec_correo', 'rec_telefono']
+        .forEach((campo) => setValue(campo, ''));
+    }
+  }, [setValue]);
+
+  // ── Emisión ──
+  const onSubmit = useCallback(async (datos) => {
     setIsLoading(true);
     setErrorApi('');
     try {
-      // Construir receptor según tipo
       let receptor = null;
       if (tipoDte === '01' && datos.rec_nombre) {
         receptor = {
@@ -309,22 +291,13 @@ const DTEEmitir = () => {
         };
       }
 
-      // Extensión
-      const tieneExtension = datos.ext_nomb_entrega || datos.ext_nomb_recibe ||
-        datos.ext_placa || datos.ext_observaciones;
-      const extension = tieneExtension ? {
-        nomb_entrega:  datos.ext_nomb_entrega  || null,
-        nomb_recibe:   datos.ext_nomb_recibe   || null,
-        placa_vehiculo: datos.ext_placa        || null,
-        observaciones: datos.ext_observaciones || null,
-      } : null;
-
-      // Documento relacionado (NC/ND)
       const documentoRelacionado = esNCND ? {
         codigo_generacion: datos.doc_rel_codgen,
         tipo_dte:          datos.doc_rel_tipo,
         fecha_emision:     datos.doc_rel_fecha,
       } : null;
+      // NOTA: "extension" ya no se envía — el esquema oficial MH del DTE no la
+      // incluye y el backend la rechaza. (Su soporte real requeriría backend.)
 
       await emitir({
         tipoDte,
@@ -332,8 +305,6 @@ const DTEEmitir = () => {
         items:               datos.items,
         pagos:               datos.pagos,
         condicionOperacion:  condicion,
-        extension,
-        passwordPri:         datos.password_pri,
         clienteId,
         documentoRelacionado,
         fusion:              datos.fusion || null,
@@ -342,665 +313,155 @@ const DTEEmitir = () => {
     } catch (_) {
       const msg = _.response?.data?.mensaje || 'No se pudo emitir el DTE.';
       setErrorApi(msg);
-      reset((v) => ({ ...v, password_pri: '' }));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [tipoDte, condicion, esNCND, emitir, clienteId]);
 
-  const isCreditoActivo = condicion === 2;
+  // Enter / botón Continuar → valida el paso actual; en el paso 5 emite
+  const alEnviarForm = useCallback((e) => {
+    e.preventDefault();
+    if (paso === 5) {
+      handleSubmit(onSubmit)();
+      return;
+    }
+    avanzar();
+  }, [paso, handleSubmit, avanzar, onSubmit]);
 
   return (
-    <div className="max-w-4xl space-y-4">
-
+    <div className="mx-auto max-w-6xl space-y-4">
       {/* Header */}
       <div>
-        <button onClick={() => navigate('/dtes')}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-2"
-          aria-label="Volver al listado">
-          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+        <button
+          onClick={() => navigate('/dtes')}
+          className="mb-2 flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          aria-label="Volver al listado"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
           Volver al listado
         </button>
         <h1 className="page-title">Emitir DTE</h1>
-        <p className="page-subtitle">Los campos marcados con * son requeridos por Hacienda</p>
+        <p className="page-subtitle">
+          Completá los pasos — los campos marcados con * son requeridos por Hacienda
+        </p>
       </div>
 
       {errorApi && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-600" role="alert">{errorApi}</p>
-        </div>
+        <Alert variant="destructive">
+          <AlertTitle className="text-sm">{errorApi}</AlertTitle>
+        </Alert>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+      <form onSubmit={alEnviarForm} noValidate className="space-y-4">
+        <EmitirStepper
+          pasoActual={paso}
+          maxPasoAlcanzado={maxPasoAlcanzado}
+          onIrAPaso={irAPaso}
+          tipoDte={tipoDte}
+        />
 
-        {/* 1. Tipo de DTE */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="font-semibold text-gray-800 font-sans">Tipo de documento</h2>
-          </div>
-          <div className="card-body">
-            <div className="flex flex-wrap gap-2">
-              {[
-                { v: '01', l: 'FCF — Factura consumidor final' },
-                { v: '03', l: 'CCF — Crédito fiscal' },
-                { v: '05', l: 'NC — Nota de crédito' },
-                { v: '06', l: 'ND — Nota de débito' },
-                { v: '14', l: 'FSE — Sujeto excluido' },
-              ].map(({ v, l }) => (
-                <button key={v} type="button" onClick={() => cambiarTipo(v)}
-                  className={`px-4 py-2 rounded-lg border text-sm transition-colors ${
-                    tipoDte === v
-                      ? 'bg-primary-50 border-primary-300 text-primary-700 font-medium'
-                      : 'bg-gray-50 border-gray-200 text-gray-600'
-                  }`}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* 2. Receptor */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="font-semibold text-gray-800 font-sans">Receptor</h2>
-            {tipoDte === '01' && (
-              <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
-                opcional &lt; $1,095 en FCF
-              </span>
+        <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-6">
+          {/* Columna del paso */}
+          <div className="space-y-4">
+            {paso === 1 && (
+              <div className="space-y-5 rounded-xl border bg-white p-5 shadow-card">
+                <Paso1Tipo tipoDte={tipoDte} onChange={cambiarTipo} />
+                <FooterPasos paso={paso} onIrAPaso={irAPaso} isLoading={isLoading} />
+              </div>
             )}
-            {esNCND && (
-              <span className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">
-                requiere DTE relacionado
-              </span>
+
+            {paso === 2 && (
+              <div className="space-y-5 rounded-xl border bg-white p-5 shadow-card">
+                <Paso2Receptor
+                  tipoDte={tipoDte}
+                  esCCF={esCCF}
+                  esFSE={esFSE}
+                  esNCND={esNCND}
+                  register={register}
+                  errors={errors}
+                  control={control}
+                  tiposDoc={tiposDoc}
+                  departamentos={departamentos}
+                  onSeleccionarCliente={onSeleccionarCliente}
+                  fcfConDatos={fcfConDatos}
+                  onSetFcfConDatos={onSetFcfConDatos}
+                  totalesPagar={totales.totalPagar}
+                />
+                <FooterPasos paso={paso} onIrAPaso={irAPaso} isLoading={isLoading} />
+              </div>
+            )}
+
+            {paso === 3 && (
+              <div className="space-y-5 rounded-xl border bg-white p-5 shadow-card">
+                <Paso3Items
+                  register={register}
+                  errors={errors}
+                  control={control}
+                  itemFields={itemFields}
+                  appendItem={appendItem}
+                  removeItem={removeItem}
+                  itemsActuales={itemsActuales}
+                  tiposItem={tiposItem}
+                  unidades={unidades}
+                  esFSE={esFSE}
+                  tipoDte={tipoDte}
+                  totales={totales}
+                />
+                <FooterPasos paso={paso} onIrAPaso={irAPaso} isLoading={isLoading} />
+              </div>
+            )}
+
+            {paso === 4 && (
+              <div className="space-y-5 rounded-xl border bg-white p-5 shadow-card">
+                <Paso4Pago
+                  register={register}
+                  errors={errors}
+                  control={control}
+                  setValue={setValue}
+                  pagoFields={pagoFields}
+                  appendPago={appendPago}
+                  removePago={removePago}
+                  condicion={condicion}
+                  setCondicion={setCondicion}
+                  totalPagar={totales.totalPagar}
+                  formasPago={formasPago}
+                  plazos={plazos}
+                />
+                <FooterPasos paso={paso} onIrAPaso={irAPaso} isLoading={isLoading} />
+              </div>
+            )}
+
+            {paso === 5 && (
+              <div className="space-y-5 rounded-xl border bg-white p-5 shadow-card">
+                <Paso5Resumen
+                  register={register}
+                  errors={errors}
+                  control={control}
+                  totales={totales}
+                  tipoDte={tipoDte}
+                  itemsActuales={itemsActuales}
+                  formasPago={formasPago}
+                  fcfConDatos={fcfConDatos}
+                  isLoading={isLoading}
+                  onAtras={() => irAPaso(4)}
+                  onCancelar={() => navigate('/dtes')}
+                />
+              </div>
             )}
           </div>
-          <div className="card-body space-y-4">
 
-            {/* Buscador de clientes — autocomplete */}
-            <div className="mb-4">
-              <label className="label mb-1.5">
-                Buscar cliente guardado
-              </label>
-              <SelectorCliente
-                tipoDte={tipoDte}
-                valorActual=""
-                onSeleccionar={(receptor, id) => {
-                  setClienteId(id || null);
-                  if (!receptor) return;
-                  // Llenar campos del formulario según tipo DTE
-                  if (tipoDte === '01') {
-                    if (receptor.nombre)        setValue('rec_nombre',   receptor.nombre);
-                    if (receptor.tipo_documento) setValue('rec_tipo_doc', receptor.tipo_documento);
-                    if (receptor.num_documento)  setValue('rec_num_doc',  receptor.num_documento);
-                    if (receptor.correo)         setValue('rec_correo',   receptor.correo);
-                    if (receptor.telefono)       setValue('rec_telefono', receptor.telefono);
-                  } else if (tipoDte === '03') {
-                    if (receptor.nombre)          setValue('rec_nombre',         receptor.nombre);
-                    if (receptor.nit)             setValue('rec_nit',            receptor.nit);
-                    if (receptor.nrc)             setValue('rec_nrc',            receptor.nrc);
-                    if (receptor.cod_actividad)   setValue('rec_cod_actividad',  receptor.cod_actividad);
-                    if (receptor.desc_actividad)  setValue('rec_desc_actividad', receptor.desc_actividad);
-                    if (receptor.correo)          setValue('rec_correo',         receptor.correo);
-                    if (receptor.telefono)        setValue('rec_telefono',       receptor.telefono);
-                    if (receptor.departamento_cod) setValue('rec_depto',         receptor.departamento_cod);
-                    if (receptor.municipio_cod)   setValue('rec_municipio',      receptor.municipio_cod);
-                  } else if (tipoDte === '14') {
-                    if (receptor.nombre)   setValue('rec_nombre',   receptor.nombre);
-                    if (receptor.nit)      setValue('rec_nit',      receptor.nit);
-                    if (receptor.correo)   setValue('rec_correo',   receptor.correo);
-                    if (receptor.telefono) setValue('rec_telefono', receptor.telefono);
-                  } else if (esNCND) {
-                    // NC/ND: mismo receptor que CCF
-                    if (receptor.nombre)          setValue('rec_nombre',         receptor.nombre);
-                    if (receptor.nit)             setValue('rec_nit',            receptor.nit);
-                    if (receptor.nrc)             setValue('rec_nrc',            receptor.nrc);
-                    if (receptor.cod_actividad)   setValue('rec_cod_actividad',  receptor.cod_actividad);
-                    if (receptor.desc_actividad)  setValue('rec_desc_actividad', receptor.desc_actividad);
-                    if (receptor.correo)          setValue('rec_correo',         receptor.correo);
-                    if (receptor.telefono)        setValue('rec_telefono',       receptor.telefono);
-                    if (receptor.departamento_cod) setValue('rec_depto',         receptor.departamento_cod);
-                    if (receptor.municipio_cod)   setValue('rec_municipio',      receptor.municipio_cod);
-                  }
-                }}
-              />
-              <p className="text-xs text-gray-400 mt-1.5">
-                O llena los campos manualmente
-              </p>
-            </div>
-            <div className="border-t border-gray-100 pt-4" />
-
-            {/* Campos manuales */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
-                <Field label="Nombre / razón social" req={esCCF || esFSE || esNCND}
-                  error={errors.rec_nombre?.message}>
-                  <input type="text" className={`input ${errors.rec_nombre ? 'input-error' : ''}`}
-                    placeholder="Nombre completo o razón social"
-                    {...register('rec_nombre')} />
-                </Field>
-              </div>
-
-              {/* FCF: tipo doc + num doc */}
-              {!esCCF && !esFSE && !esNCND && (
-                <>
-                  <Field label="Tipo de documento">
-                    <select className="input" {...register('rec_tipo_doc')}>
-                      {TIPOS_DOC.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Número de documento">
-                    <input type="text" className="input font-mono"
-                      placeholder="00000000-0" {...register('rec_num_doc')} />
-                  </Field>
-                </>
-              )}
-
-              {/* CCF, FSE, NC, ND: NIT */}
-              {(esCCF || esFSE || esNCND) && (
-                <Field label="NIT" req error={errors.rec_nit?.message}>
-                  <input type="text" className={`input font-mono ${errors.rec_nit ? 'input-error' : ''}`}
-                    placeholder="0000-000000-000-0" {...register('rec_nit')} />
-                </Field>
-              )}
-
-              {/* CCF + NC/ND: NRC */}
-              {(esCCF || esNCND) && (
-                <Field label="NRC" error={errors.rec_nrc?.message}>
-                  <input type="text" className="input font-mono"
-                    placeholder="000000-0" {...register('rec_nrc')} />
-                </Field>
-              )}
-
-              <Field label="Correo" error={errors.rec_correo?.message}>
-                <input type="email" className={`input ${errors.rec_correo ? 'input-error' : ''}`}
-                  placeholder="correo@empresa.com" {...register('rec_correo')} />
-              </Field>
-
-              <Field label="Teléfono">
-                <input type="text" className="input" placeholder="00000000"
-                  {...register('rec_telefono')} />
-              </Field>
-            </div>
-
-            {/* Campos exclusivos CCF + NC/ND */}
-            <div>
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
-                Datos adicionales — requeridos en CCF / NC / ND
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Código de actividad económica">
-                  <input type="text" className="input font-mono"
-                    placeholder="00000" disabled={!esCCF && !esNCND}
-                    {...register('rec_cod_actividad')} />
-                  {!esCCF && !esNCND && <DisabledNote msg="solo CCF / NC / ND" />}
-                </Field>
-                <Field label="Descripción de actividad">
-                  <input type="text" className="input"
-                    placeholder="Ej: Venta al por menor..." disabled={!esCCF && !esNCND}
-                    {...register('rec_desc_actividad')} />
-                  {!esCCF && !esNCND && <DisabledNote msg="solo CCF / NC / ND" />}
-                </Field>
-                <Field label="Departamento">
-                  <select className="input" disabled={!esCCF && !esNCND} {...register('rec_depto')}>
-                    <option value="">Seleccionar...</option>
-                    {DEPARTAMENTOS.map(d => (
-                      <option key={d.cod} value={d.cod}>{d.nombre || d.label}</option>
-                    ))}
-                  </select>
-                  {!esCCF && !esNCND && <DisabledNote msg="solo CCF / NC / ND" />}
-                </Field>
-                <Field label="Distrito (municipio — CAT-013)">
-                  <input type="text" className="input font-mono"
-                    placeholder="Ej: 23 = San Salvador Centro"
-                    disabled={!esCCF && !esNCND} {...register('rec_municipio')} />
-                  {!esCCF && !esNCND && <DisabledNote msg="solo CCF / NC / ND" />}
-                </Field>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 2b. Documento relacionado — NC / ND */}
-        {esNCND && (
-          <div className="card">
-            <div className="card-header">
-              <h2 className="font-semibold text-gray-800 font-sans">Documento relacionado</h2>
-              <span className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
-                requerido
-              </span>
-            </div>
-            <div className="card-body">
-              <p className="text-xs text-gray-400 mb-4">
-                Ingresa los datos del DTE original al que aplica esta {tipoDte === '05' ? 'nota de crédito' : 'nota de débito'}.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Field label="Código de generación" req error={errors.doc_rel_codgen?.message}>
-                  <input type="text" className={`input font-mono text-sm ${errors.doc_rel_codgen ? 'input-error' : ''}`}
-                    placeholder="UUID del DTE original"
-                    {...register('doc_rel_codgen')} />
-                </Field>
-                <Field label="Tipo DTE original" req error={errors.doc_rel_tipo?.message}>
-                  <select className={`input ${errors.doc_rel_tipo ? 'input-error' : ''}`}
-                    {...register('doc_rel_tipo')}>
-                    <option value="">Seleccionar...</option>
-                    <option value="01">FCF (01)</option>
-                    <option value="03">CCF (03)</option>
-                    <option value="04">Nota de Remisión (04)</option>
-                    <option value="05">Nota de Crédito (05)</option>
-                    <option value="06">Nota de Débito (06)</option>
-                  </select>
-                </Field>
-                <Field label="Fecha de emisión" req error={errors.doc_rel_fecha?.message}>
-                  <input type="date"
-                    className={`input ${errors.doc_rel_fecha ? 'input-error' : ''}`}
-                    {...register('doc_rel_fecha')} />
-                </Field>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 2c. Datos adicionales — NC/ND + FSE */}
-        {(esNCND || esFSE) && (
-          <div className="card">
-            <div className="card-header">
-              <h2 className="font-semibold text-gray-800 font-sans">Datos adicionales</h2>
-            </div>
-            <div className="card-body space-y-3">
-              {esNCND && (
-                <Field label="Fusión (NIT)" note="Solo si aplica fusión empresarial — opcional">
-                  <input type="text" className="input font-mono"
-                    placeholder="0000-000000-000-0"
-                    {...register('fusion')} />
-                </Field>
-              )}
-              <Field label="Observaciones" note={`Máximo 3000 caracteres — ${esNCND ? 'requerido por Hacienda en NC/ND' : 'opcional en FSE'}`}>
-                <textarea rows={2} className="input resize-none"
-                  placeholder={esNCND ? 'Motivo de la nota...' : 'Observaciones adicionales...'}
-                  {...register('observaciones')} />
-                {errors.observaciones && (
-                  <p className="error-msg" role="alert">{errors.observaciones.message}</p>
-                )}
-              </Field>
-            </div>
-          </div>
-        )}
-
-        {/* 3. Ítems */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="font-semibold text-gray-800 font-sans">Ítems</h2>
-            <button type="button" onClick={() => appendItem({ ...ITEM_VACIO })}
-              className="btn-secondary btn-sm flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-              Agregar ítem
-            </button>
-          </div>
-          <div className="card-body">
-            {/* Cabecera tabla */}
-            <div className="hidden lg:grid gap-2 pb-2 border-b border-gray-100 mb-3"
-              style={{gridTemplateColumns: esFSE
-                ? '2fr .6fr .55fr .65fr .6fr .7fr .38fr'
-                : '2fr .6fr .55fr .65fr .6fr .6fr .6fr .38fr'
-              }}>
-              {esFSE
-                ? ['Descripción','Tipo','Cant.','Precio','Desc.%','Compra',''].map((h, i) => (
-                  <span key={i} className={`text-xs text-gray-400 font-medium uppercase tracking-wide ${i>1?'text-right':''}`}>{h}</span>
-                ))
-                : ['Descripción','Tipo','Cant.','Precio','Desc.%','No suj.','Exenta',''].map((h, i) => (
-                  <span key={i} className={`text-xs text-gray-400 font-medium uppercase tracking-wide ${i>1?'text-right':''}`}>{h}</span>
-                ))
-              }
-            </div>
-
-            {itemFields.map((field, idx) => (
-              <div key={field.id} className="lg:grid gap-2 mb-3 pb-3 border-b border-gray-50 last:border-0 last:mb-0 last:pb-0 space-y-2 lg:space-y-0 items-center"
-                style={{gridTemplateColumns: esFSE
-                  ? '2fr .6fr .55fr .65fr .6fr .7fr .38fr'
-                  : '2fr .6fr .55fr .65fr .6fr .6fr .6fr .38fr'
-                }}>
-
-                {/* Descripción */}
-                <div>
-                  <label className="label lg:hidden">Descripción *</label>
-                  <input type="text" placeholder="Descripción del producto o servicio"
-                    className={`input text-sm ${errors.items?.[idx]?.descripcion ? 'input-error' : ''}`}
-                    {...register(`items.${idx}.descripcion`)} />
-                  {errors.items?.[idx]?.descripcion && (
-                    <p className="error-msg">{errors.items[idx].descripcion.message}</p>
-                  )}
-                </div>
-
-                {/* Tipo ítem */}
-                <div>
-                  <label className="label lg:hidden">Tipo</label>
-                  <select className="input text-sm" {...register(`items.${idx}.tipo_item`)}>
-                    {TIPOS_ITEM.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-
-                {/* Cantidad */}
-                <div>
-                  <label className="label lg:hidden">Cantidad *</label>
-                  <input type="number" min="0.0001" step="0.0001"
-                    className="input input-number text-sm text-right"
-                    {...register(`items.${idx}.cantidad`)} />
-                </div>
-
-                {/* Precio */}
-                <div>
-                  <label className="label lg:hidden">Precio ($) *</label>
-                  <input type="number" min="0.01" step="0.01"
-                    className="input input-number text-sm text-right"
-                    {...register(`items.${idx}.precio_unitario`)} />
-                </div>
-
-                {/* Descuento % */}
-                <div className="relative">
-                  <label className="label lg:hidden">Desc. %</label>
-                  <input type="number" min="0" max="99.99" step="0.01"
-                    placeholder="0"
-                    className="input input-number text-sm text-right pr-5"
-                    {...register(`items.${idx}.descuento_pct`)} />
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">%</span>
-                  {errors.items?.[idx]?.descuento_pct && (
-                    <p className="error-msg text-xs">{errors.items[idx].descuento_pct.message}</p>
-                  )}
-                </div>
-
-                {/* Venta no sujeta — no aplica FSE */}
-                {!esFSE && (
-                  <div>
-                    <label className="label lg:hidden">No suj. ($)</label>
-                    <input type="number" min="0" step="0.01" placeholder="0.00"
-                      className="input input-number text-sm text-right"
-                      {...register(`items.${idx}.venta_no_suj`)} />
-                  </div>
-                )}
-
-                {/* Venta exenta — no aplica FSE */}
-                {!esFSE && (
-                  <div>
-                    <label className="label lg:hidden">Exenta ($)</label>
-                    <input type="number" min="0" step="0.01" placeholder="0.00"
-                      className="input input-number text-sm text-right"
-                      {...register(`items.${idx}.venta_exenta`)} />
-                  </div>
-                )}
-
-                {/* Compra — solo FSE */}
-                {esFSE && (
-                  <div>
-                    <label className="label lg:hidden">Compra ($)</label>
-                    <input type="number" min="0" step="0.01" placeholder="0.00"
-                      className="input input-number text-sm text-right"
-                      {...register(`items.${idx}.compra`)} />
-                  </div>
-                )}
-
-                {/* Eliminar */}
-                <button type="button"
-                  onClick={() => itemFields.length > 1 && removeItem(idx)}
-                  disabled={itemFields.length === 1}
-                  aria-label={`Eliminar ítem ${idx + 1}`}
-                  className="flex items-center justify-center p-1.5 text-gray-300 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded">
-                  <Trash2 className="w-4 h-4" aria-hidden="true" />
-                </button>
-              </div>
-            ))}
-
-            {/* Resumen desglosado completo */}
-            <div className="bg-gray-50 rounded-lg p-4 mt-4 space-y-1.5">
-              {esFSE ? (
-                <>
-                  <div className="flex justify-between text-sm text-gray-700">
-                    <span>Total compra</span>
-                    <span className="font-mono">{formatMonto(totales.totalCompra)}</span>
-                  </div>
-                  {totales.descuGravada > 0 && (
-                    <div className="flex justify-between text-sm text-green-600">
-                      <span>Descuento</span>
-                      <span className="font-mono">−{formatMonto(totales.descuGravada)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm text-gray-700">
-                    <span>Subtotal</span>
-                    <span className="font-mono">{formatMonto(totales.subTotalFSE)}</span>
-                  </div>
-                  {totales.reteRenta > 0 && (
-                    <div className="flex justify-between text-sm text-orange-600">
-                      <span>Retención Renta</span>
-                      <span className="font-mono">{formatMonto(totales.reteRenta)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-base font-semibold text-gray-900 pt-2 border-t border-gray-200">
-                    <span>Total a pagar</span>
-                    <span className="font-mono">{formatMonto(totales.totalPagar)}</span>
-                  </div>
-                </>
-              ) : (
-                <>
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Total no sujeto</span>
-                <span className="font-mono">{formatMonto(totales.totalNoSuj)}</span>
-              </div>
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Total exento</span>
-                <span className="font-mono">{formatMonto(totales.totalExenta)}</span>
-              </div>
-              <div className="flex justify-between text-sm text-gray-700">
-                <span>Total gravado</span>
-                <span className="font-mono">{formatMonto(totales.totalGravada)}</span>
-              </div>
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Subtotal ventas</span>
-                <span className="font-mono">{formatMonto(totales.subTotalVentas)}</span>
-              </div>
-              {totales.descuGravada > 0 && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>Descuento</span>
-                  <span className="font-mono">−{formatMonto(totales.descuGravada)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Subtotal</span>
-                <span className="font-mono">{formatMonto(totales.subTotal)}</span>
-              </div>
-              {(tipoDte === '03' || esNCND) && (
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>IVA 13% (tributo 20)</span>
-                  <span className="font-mono">{formatMonto(totales.ivaValor)}</span>
-                </div>
-              )}
-              {tipoDte === '01' && (
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>IVA 13% (incluido)</span>
-                  <span className="font-mono">{formatMonto(totales.ivaValor)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-base font-semibold text-gray-900 pt-2 border-t border-gray-200">
-                <span>Total a pagar</span>
-                <span className="font-mono">{formatMonto(totales.totalPagar)}</span>
-              </div>
-              {totales.totalPagar > 0 && (
-                <p className="text-xs text-gray-400 italic text-right mt-1">
-                  {numeroALetras(totales.totalPagar)}
+          {/* Columna lateral: totales siempre visibles (desktop) */}
+          <aside className="hidden xl:block">
+            <div className="sticky top-6 space-y-4">
+              <PanelTotales totales={totales} tipoDte={tipoDte} items={itemsActuales} />
+              {errorCatalogos && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  No se pudieron cargar los catálogos de Hacienda. Algunos selectores pueden verse vacíos.
                 </p>
               )}
-                </>
-              ) }
             </div>
-          </div>
+          </aside>
         </div>
-
-        {/* 4. Condición y pagos */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="font-semibold text-gray-800 font-sans">Condición y forma de pago</h2>
-          </div>
-          <div className="card-body">
-            {/* Condición */}
-            <div className="flex gap-2 mb-4">
-              {[{v:1,l:'Contado (1)'},{v:2,l:'Crédito (2)'},{v:3,l:'Otro (3)'}].map(({v,l}) => (
-                <button key={v} type="button" onClick={() => setCondicion(v)}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                    condicion === v
-                      ? 'bg-gray-900 text-white border-gray-900'
-                      : 'bg-gray-50 text-gray-600 border-gray-200'
-                  }`}>{l}</button>
-              ))}
-            </div>
-
-            {/* Cabecera pagos */}
-            <div className="hidden sm:grid gap-2 pb-2 border-b border-gray-100 mb-3"
-              style={{gridTemplateColumns:'1.8fr 1fr 1fr .9fr 1fr 32px'}}>
-              {['Forma de pago','Monto','Referencia','Plazo','Período',''].map((h,i) => (
-                <span key={i} className="text-xs text-gray-400 font-medium uppercase tracking-wide">{h}</span>
-              ))}
-            </div>
-
-            {pagoFields.map((field, idx) => (
-              <div key={field.id}
-                className="sm:grid gap-2 mb-3 space-y-2 sm:space-y-0 items-end"
-                style={{gridTemplateColumns:'1.8fr 1fr 1fr .9fr 1fr 32px'}}>
-
-                <div>
-                  <label className="label sm:hidden">Forma de pago *</label>
-                  <select className="input text-sm" {...register(`pagos.${idx}.codigo`)}>
-                    {FORMAS_PAGO.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="label sm:hidden">Monto *</label>
-                  <input type="number" min="0.01" step="0.01"
-                    className="input input-number text-sm text-right"
-                    {...register(`pagos.${idx}.montoPago`)} />
-                  {errors.pagos?.[idx]?.montoPago && (
-                    <p className="error-msg text-xs">{errors.pagos[idx].montoPago.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="label sm:hidden">Referencia</label>
-                  <input type="text" className="input text-sm"
-                    placeholder="Núm. transacción..."
-                    {...register(`pagos.${idx}.referencia`)} />
-                </div>
-                <div>
-                  <label className="label sm:hidden">Plazo</label>
-                  <select className="input text-sm"
-                    disabled={!isCreditoActivo}
-                    {...register(`pagos.${idx}.plazo`)}>
-                    <option value="">— plazo —</option>
-                    {PLAZOS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                  </select>
-                  {!isCreditoActivo && <DisabledNote msg="solo crédito" />}
-                </div>
-                <div>
-                  <label className="label sm:hidden">Período</label>
-                  <input type="number" min="1" step="1"
-                    className="input input-number text-sm"
-                    placeholder="Ej: 30"
-                    disabled={!isCreditoActivo}
-                    {...register(`pagos.${idx}.periodo`)} />
-                  {!isCreditoActivo && <DisabledNote msg="solo crédito" />}
-                </div>
-                <button type="button"
-                  onClick={() => pagoFields.length > 1 && removePago(idx)}
-                  disabled={pagoFields.length === 1}
-                  aria-label={`Eliminar pago ${idx + 1}`}
-                  className="flex items-center justify-center p-1.5 text-gray-300 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-colors">
-                  <Trash2 className="w-4 h-4" aria-hidden="true" />
-                </button>
-              </div>
-            ))}
-
-            <button type="button"
-              onClick={() => appendPago({ ...PAGO_VACIO })}
-              className="flex items-center gap-1.5 text-xs text-primary-600 mt-2 font-medium">
-              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-              Agregar otra forma de pago
-            </button>
-          </div>
-        </div>
-
-        {/* 5. Extensión */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="font-semibold text-gray-800 font-sans">
-              Extensión
-              <span className="text-xs font-normal text-gray-400 ml-2">
-                opcional — para talleres, facturas con entrega física
-              </span>
-            </h2>
-          </div>
-          <div className="card-body grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Nombre quien entrega">
-              <input type="text" className="input"
-                placeholder="Nombre completo" {...register('ext_nomb_entrega')} />
-            </Field>
-            <Field label="Nombre quien recibe">
-              <input type="text" className="input"
-                placeholder="Nombre completo" {...register('ext_nomb_recibe')} />
-            </Field>
-            <Field label="Placa de vehículo">
-              <input type="text" className="input font-mono"
-                placeholder="P86B78" {...register('ext_placa')} />
-            </Field>
-            <Field label="Observaciones">
-              <input type="text" className="input"
-                placeholder="Notas adicionales..." {...register('ext_observaciones')} />
-            </Field>
-          </div>
-        </div>
-
-        {/* 6. Firma */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="font-semibold text-gray-800 font-sans">Firma electrónica</h2>
-          </div>
-          <div className="card-body">
-            <div className="max-w-sm">
-              <Field label="Contraseña de firma (passwordPri)" req
-                error={errors.password_pri?.message}>
-                <div className="relative">
-                  <input type={showPwd ? 'text' : 'password'}
-                    autoComplete="off"
-                    placeholder="Contraseña del certificado"
-                    className={`input pr-10 ${errors.password_pri ? 'input-error' : ''}`}
-                    {...register('password_pri')} />
-                  <button type="button"
-                    aria-label={showPwd ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                    onClick={() => setShowPwd(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                    {showPwd
-                      ? <EyeOff className="w-4 h-4" aria-hidden="true" />
-                      : <Eye    className="w-4 h-4" aria-hidden="true" />}
-                  </button>
-                </div>
-              </Field>
-              <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                <Lock className="w-3 h-3" aria-hidden="true" />
-                No se almacena — solo se usa para firmar este documento
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Acciones */}
-        <div className="flex gap-3 justify-end">
-          <button type="button" onClick={() => navigate('/dtes')}
-            className="btn-secondary" disabled={isLoading}>
-            Cancelar
-          </button>
-          <button type="submit" disabled={isLoading} className="btn-primary">
-            {isLoading
-              ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Emitiendo...</>
-              : 'Emitir DTE'
-            }
-          </button>
-        </div>
-
       </form>
     </div>
   );

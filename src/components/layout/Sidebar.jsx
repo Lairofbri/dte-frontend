@@ -8,7 +8,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, AlertTriangle, ReceiptText,
   Settings, Building2, Users, ClipboardList, UserSquare2,
-  Rocket, ChevronLeft, ChevronRight, ChevronDown,
+  Rocket, ChevronLeft, ChevronRight, ChevronDown, Package,
 } from 'lucide-react';
 import { useAuthStore, selectEsAdmin, selectEsPlataforma, selectUsuario } from '../../store/auth.store';
 
@@ -17,6 +17,7 @@ const menuPrincipal = [
   { label: 'Dashboard',    path: '/dashboard',    icon: LayoutDashboard },
   { label: 'Contingencia', path: '/contingencia',  icon: AlertTriangle  },
   { label: 'Clientes',     path: '/clientes',      icon: UserSquare2     },
+  { label: 'Productos',    path: '/productos',     icon: Package         },
 ];
 
 const dteSubmenu = [

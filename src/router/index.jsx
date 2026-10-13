@@ -17,6 +17,7 @@ import Establecimientos from '../pages/Establecimientos';
 import Usuarios        from '../pages/Usuarios';
 import Onboarding      from '../pages/Onboarding';
 import Clientes        from '../pages/Clientes';
+import Productos       from '../pages/Productos';
 import Contingencia    from '../pages/Contingencia';
 import Auditoria       from '../pages/Auditoria';
 import NotFound        from '../pages/NotFound';
@@ -72,6 +73,10 @@ const router = createBrowserRouter([
       {
         path:    'clientes',
         element: <Clientes />,
+      },
+      {
+        path:    'productos',
+        element: <Productos />,
       },
       {
         path:    'auditoria',

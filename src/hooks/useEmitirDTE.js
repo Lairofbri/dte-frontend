@@ -130,7 +130,7 @@ export const useEmitirDTE = () => {
 
   const emitir = useCallback(async ({
     tipoDte, receptor, items, pagos,
-    condicionOperacion, extension, passwordPri,
+    condicionOperacion,
     documentoRelacionado, fusion, observaciones,
   }) => {
     const esFSE   = tipoDte === '14';
@@ -145,6 +145,7 @@ export const useEmitirDTE = () => {
 
       const mapped = {
         descripcion:     item.descripcion,
+        codigo:          item.codigo || null,
         cantidad,
         precio_unitario: precio,
         descuento,
@@ -168,8 +169,9 @@ export const useEmitirDTE = () => {
       items:               itemsMapeados,
       condicion_operacion: condicionOperacion || 1,
       pagos:               pagos || null,
-      extension:           extension || null,
-      password_pri:        passwordPri,
+      // NOTA: password_pri NO se envía desde el frontend (firma interna con la
+      // credencial configurada — migración 030). Tampoco se envía "extension":
+      // el esquema oficial MH del DTE no la incluye (additionalProperties:false).
     };
 
     // NC/ND: documento_relacionado requerido
