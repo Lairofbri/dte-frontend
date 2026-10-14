@@ -19,6 +19,9 @@ export const useAuthStore = create((set) => ({
   usuario:         null,
   tenantId:        null,
   establecimientoId: null,
+  // Fase C3 — sucursal elegida por el administrador post-login (cards).
+  // Los operadores emiten siempre con el establecimiento fijo de su JWT.
+  establecimientoSeleccionado: null,
   isAuthenticated: false,
   isLoading:       true,
 
@@ -30,8 +33,25 @@ export const useAuthStore = create((set) => ({
     usuario,
     tenantId: usuario?.tenant_id || null,
     establecimientoId: usuario?.establecimiento_id || null,
+    // Sesión nueva (login/restore): la selección se re-hace por el selector.
+    establecimientoSeleccionado: null,
     isAuthenticated: true,
     isLoading:       false,
+  }),
+
+  /**
+   * Guarda la sucursal elegida en el selector post-login (Fase C3).
+   * Recibe el establecimiento completo de `GET /api/establecimientos` y
+   * conserva solo lo que la sesión necesita mostrar.
+   */
+  setEstablecimientoSeleccionado: (establecimiento) => set({
+    establecimientoSeleccionado: establecimiento
+      ? {
+          id:             establecimiento.id,
+          nombre:         establecimiento.nombre,
+          cod_estable_mh: establecimiento.cod_estable_mh ?? null,
+        }
+      : null,
   }),
 
   setAccessToken: (accessToken) => set({ accessToken }),
@@ -41,6 +61,7 @@ export const useAuthStore = create((set) => ({
     usuario:         null,
     tenantId:        null,
     establecimientoId: null,
+    establecimientoSeleccionado: null,
     isAuthenticated: false,
     isLoading:       false,
   }),
@@ -61,6 +82,12 @@ export const selectEsPlataforma =
 
 export const selectEstablecimientoId =
   (state) => state.establecimientoId;
+
+export const selectEstablecimientoSeleccionado =
+  (state) => state.establecimientoSeleccionado;
+
+export const selectEstablecimientoSeleccionadoId =
+  (state) => state.establecimientoSeleccionado?.id ?? null;
 
 export const selectTenantId =
   (state) => state.tenantId;

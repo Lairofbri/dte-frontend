@@ -23,7 +23,14 @@ export const useAuth = () => {
         accessToken: resultado.access_token,
         usuario:     resultado.usuario,
       });
-      navigate('/dashboard');
+      // Fase C3 — el administrador elige sucursal antes de operar (cards
+      // post-login; con una sola activa se auto-selecciona). El operador
+      // sigue directo: su establecimiento es fijo (JWT).
+      navigate(
+        resultado.usuario?.rol === 'administrador'
+          ? '/seleccionar-sucursal'
+          : '/dashboard'
+      );
     } catch (err) {
       const mensaje = err.response?.data?.mensaje || 'Error al iniciar sesión.';
       toast.error(mensaje);

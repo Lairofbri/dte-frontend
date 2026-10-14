@@ -9,6 +9,7 @@ import {
   emitirFCFApi, emitirCCFApi, emitirFSEApi,
   emitirNotaCreditoApi, emitirNotaDebitoApi,
 } from '../api/dtes.api';
+import { useAuthStore, selectEstablecimientoSeleccionado } from '../store/auth.store';
 
 // ─────────────────────────────────────────────
 // CÁLCULO DE TOTALES — estructura completa Hacienda
@@ -127,6 +128,9 @@ const calcularTotalesFSE = (items = []) => {
 // ─────────────────────────────────────────────
 export const useEmitirDTE = () => {
   const navigate = useNavigate();
+  // Fase C3 — sucursal elegida por el administrador (selector post-login).
+  // Para operadores es null: emiten con el establecimiento fijo del JWT.
+  const establecimientoSeleccionado = useAuthStore(selectEstablecimientoSeleccionado);
 
   const emitir = useCallback(async ({
     tipoDte, receptor, items, pagos,
@@ -174,6 +178,12 @@ export const useEmitirDTE = () => {
       // el esquema oficial MH del DTE no la incluye (additionalProperties:false).
     };
 
+    // Fase C3 — el administrador emite con la sucursal que eligió en el
+    // selector post-login (el backend le da precedencia al body para su rol).
+    if (establecimientoSeleccionado?.id) {
+      cuerpo.establecimiento_id = establecimientoSeleccionado.id;
+    }
+
     // NC/ND: documento_relacionado requerido
     if ((esNC || esND) && documentoRelacionado) {
       cuerpo.documento_relacionado = {
@@ -209,7 +219,7 @@ export const useEmitirDTE = () => {
       toast.error(mensaje);
       throw err;
     }
-  }, [navigate]);
+  }, [navigate, establecimientoSeleccionado]);
 
   return { emitir };
 };

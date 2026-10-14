@@ -14,6 +14,7 @@ import DTEDetalle      from '../pages/DTEs/DTEDetalle';
 import DTEEmitir       from '../pages/DTEs/DTEEmitir';
 import Configuracion   from '../pages/Configuracion';
 import Establecimientos from '../pages/Establecimientos';
+import SeleccionarSucursal from '../pages/SeleccionarSucursal';
 import Usuarios        from '../pages/Usuarios';
 import Onboarding      from '../pages/Onboarding';
 import Clientes        from '../pages/Clientes';
@@ -27,6 +28,18 @@ const router = createBrowserRouter([
   {
     path:    '/login',
     element: <Login />,
+  },
+
+  // ── Fase C3 — selector de sucursal post-login (solo administrador) ──
+  {
+    path:    '/seleccionar-sucursal',
+    element: (
+      <ProtectedRoute>
+        <AdminRoute>
+          <SeleccionarSucursal />
+        </AdminRoute>
+      </ProtectedRoute>
+    ),
   },
 
   // ── Rutas protegidas — requieren JWT válido ──

@@ -4,13 +4,13 @@
 // DTEs tiene submenú desplegable: Listado / Emitir
 
 import { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, AlertTriangle, ReceiptText,
   Settings, Building2, Users, ClipboardList, UserSquare2,
   Rocket, ChevronLeft, ChevronRight, ChevronDown, Package,
 } from 'lucide-react';
-import { useAuthStore, selectEsAdmin, selectEsPlataforma, selectUsuario } from '../../store/auth.store';
+import { useAuthStore, selectEsAdmin, selectEsPlataforma, selectUsuario, selectEstablecimientoSeleccionado } from '../../store/auth.store';
 
 // ── Datos estáticos de menú ──
 const menuPrincipal = [
@@ -133,6 +133,10 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
   const usuario = useAuthStore(selectUsuario);
   const esAdmin  = useAuthStore(selectEsAdmin);
   const esPlataforma = useAuthStore(selectEsPlataforma);
+  // Fase C3 — la sucursal elegida post-login manda sobre la del JWT.
+  const establecimientoSeleccionado = useAuthStore(selectEstablecimientoSeleccionado);
+  const establecimientoActivo = establecimientoSeleccionado ?? usuario?.establecimiento;
+  const navigate = useNavigate();
 
   const [principalAbierto, setPrincipalAbierto] = useState(true);
   const [adminAbierto,     setAdminAbierto]     = useState(true);
@@ -192,16 +196,25 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
           ) : null}
         </div>
 
-        {/* ── Establecimiento activo ── */}
-        {!esColapsado && usuario?.establecimiento ? (
+        {/* ── Establecimiento activo (Fase C3: el elegido, si existe) ── */}
+        {!esColapsado && establecimientoActivo ? (
           <div className="px-5 py-3 border-b border-white/10">
             <p className="text-sidebar-text text-[11px]">Establecimiento</p>
             <p className="text-white text-sm font-medium truncate mt-0.5">
-              {usuario.establecimiento.nombre}
+              {establecimientoActivo.nombre}
             </p>
             <p className="text-primary-400 text-[11px] font-mono mt-0.5">
-              {usuario.establecimiento.cod_estable_mh}
+              {establecimientoActivo.cod_estable_mh ?? '—'}
             </p>
+            {esAdmin ? (
+              <button
+                type="button"
+                onClick={() => navigate('/seleccionar-sucursal')}
+                className="mt-1 text-[11px] font-medium text-primary-400 hover:text-primary-300 transition-colors"
+              >
+                Cambiar sucursal
+              </button>
+            ) : null}
           </div>
         ) : null}
 
