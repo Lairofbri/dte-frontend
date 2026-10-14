@@ -3,7 +3,7 @@
 // Campos según el schema exacto del backend
 
 import { useEffect, useId, useState, useCallback } from 'react';
-import { useForm }          from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver }      from '@hookform/resolvers/zod';
 import { z }                from 'zod';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
@@ -11,6 +11,7 @@ import Modal  from '../ui/Modal';
 import Button from '../ui/Button';
 import { BadgeGenerico } from '../ui/Badge';
 import { listarEstablecimientosApi } from '../../api/establecimientos.api';
+import { useTerritorio } from '../../hooks/useTerritorio';
 
 // Estados fiscales del vínculo POS ↔ DTE (spec §5)
 const INFO_ESTADO_FISCAL = {
@@ -43,25 +44,9 @@ const DEPARTAMENTOS = [
   { cod: '14', nombre: 'La Unión'     },
 ];
 
-// Hacienda aún usa municipio_cod internamente aunque
-// la división administrativa cambió — usar los códigos del catálogo DTE
-// Nota: pendiente actualizar cuando Hacienda publique nuevos catálogos
-const MUNICIPIOS = {
-  '01': [{ cod: '01', nombre: 'Ahuachapán' }, { cod: '02', nombre: 'Apaneca' }, { cod: '03', nombre: 'Atiquizaya' }, { cod: '04', nombre: 'Concepción de Ataco' }],
-  '02': [{ cod: '01', nombre: 'Santa Ana' }, { cod: '02', nombre: 'Coatepeque' }, { cod: '03', nombre: 'Chalchuapa' }, { cod: '04', nombre: 'El Congo' }],
-  '03': [{ cod: '01', nombre: 'Sonsonate' }, { cod: '02', nombre: 'Acajutla' }, { cod: '03', nombre: 'Armenia' }, { cod: '04', nombre: 'Izalco' }],
-  '04': [{ cod: '01', nombre: 'Chalatenango' }, { cod: '02', nombre: 'Agua Caliente' }, { cod: '03', nombre: 'La Palma' }],
-  '05': [{ cod: '01', nombre: 'Nueva San Salvador' }, { cod: '02', nombre: 'Antiguo Cuscatlán' }, { cod: '03', nombre: 'Colón' }, { cod: '04', nombre: 'Santa Tecla' }],
-  '06': [{ cod: '01', nombre: 'San Salvador' }, { cod: '02', nombre: 'Mejicanos' }, { cod: '03', nombre: 'Soyapango' }, { cod: '04', nombre: 'San Marcos' }, { cod: '05', nombre: 'Ilopango' }, { cod: '06', nombre: 'Apopa' }],
-  '07': [{ cod: '01', nombre: 'Cojutepeque' }, { cod: '02', nombre: 'San Pedro Perulapán' }, { cod: '03', nombre: 'Santa Cruz Michapa' }],
-  '08': [{ cod: '01', nombre: 'Zacatecoluca' }, { cod: '02', nombre: 'San Luis Talpa' }, { cod: '03', nombre: 'Olocuilta' }],
-  '09': [{ cod: '01', nombre: 'Sensuntepeque' }, { cod: '02', nombre: 'Ilobasco' }, { cod: '03', nombre: 'Victoria' }],
-  '10': [{ cod: '01', nombre: 'San Vicente' }, { cod: '02', nombre: 'Apastepeque' }, { cod: '03', nombre: 'Tepetitán' }],
-  '11': [{ cod: '01', nombre: 'Usulután' }, { cod: '02', nombre: 'Jiquilisco' }, { cod: '03', nombre: 'Santiago de María' }],
-  '12': [{ cod: '01', nombre: 'San Miguel' }, { cod: '02', nombre: 'Moncagua' }, { cod: '03', nombre: 'Chinameca' }],
-  '13': [{ cod: '01', nombre: 'San Francisco Gotera' }, { cod: '02', nombre: 'Jocoro' }, { cod: '03', nombre: 'Osicala' }],
-  '14': [{ cod: '01', nombre: 'La Unión' }, { cod: '02', nombre: 'Santa Rosa de Lima' }, { cod: '03', nombre: 'Conchagua' }],
-};
+// Municipio (CAT-013) y Distrito (CAT-008): SIEMPRE desde el catálogo oficial
+// filtrado por departamento (useTerritorio → migración 034). Los códigos se
+// repiten entre departamentos — nunca hardcodear listas locales.
 
 // ─────────────────────────────────────────────
 // SCHEMA
@@ -76,7 +61,8 @@ const schema = z.object({
   cod_punto_venta_mh: z.string().min(1, 'Requerido.').regex(codRegex, '1-4 caracteres alfanuméricos.'),
   direccion:          z.string().min(5, 'Mínimo 5 caracteres.'),
   departamento_cod:   z.string().length(2, 'Selecciona un departamento.'),
-  municipio_cod:      z.string().min(1, 'Selecciona un municipio.'),
+  municipio_cod:      z.string().length(2, 'Selecciona un municipio (CAT-013).'),
+  distrito_cod:       z.string().length(2, 'Selecciona un distrito (CAT-008).'),
   telefono:           z.string().max(20).optional().or(z.literal('')),
   email:              z.string().email('Email inválido.').optional().or(z.literal('')),
 });
@@ -94,16 +80,35 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
   const [errorApi,     setErrorApi]     = useState('');
   const [deptoActual,  setDeptoActual]  = useState('06');
 
+  // Catálogos territoriales oficiales del departamento seleccionado
+  // (municipio CAT-013 / distrito CAT-008 — migración 034).
+  const {
+    municipios, distritos,
+    cargando: cargandoTerritorio,
+    error:    errorTerritorio,
+  } = useTerritorio(deptoActual);
+
   const {
     register,
     handleSubmit,
     reset,
     getValues,
+    setValue,
+    control,
     formState: { errors, isSubmitting, isValid },
   } = useForm({
     resolver: zodResolver(schema),
     mode:     'onChange',
   });
+
+  const municipioActual = useWatch({ control, name: 'municipio_cod' });
+  const distritoActual  = useWatch({ control, name: 'distrito_cod' });
+  const municipioFueraDeCatalogo = !cargandoTerritorio && !errorTerritorio
+    && municipioActual && municipios.length > 0
+    && !municipios.some((m) => m.value === municipioActual);
+  const distritoFueraDeCatalogo = !cargandoTerritorio && !errorTerritorio
+    && distritoActual && distritos.length > 0
+    && !distritos.some((d) => d.value === distritoActual);
 
   useEffect(() => {
     if (isOpen) {
@@ -119,7 +124,8 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
           cod_punto_venta_mh: establecimiento?.cod_punto_venta_mh ?? '',
           direccion:          establecimiento?.direccion          ?? '',
           departamento_cod:   depto,
-          municipio_cod:      establecimiento?.municipio_cod      ?? '01',
+          municipio_cod:      establecimiento?.municipio_cod      ?? '',
+          distrito_cod:       establecimiento?.distrito_cod       ?? '',
           telefono:           establecimiento?.telefono           ?? '',
           email:              establecimiento?.email              ?? '',
         });
@@ -175,8 +181,6 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
       setErrorApi(mensaje);
     }
   };
-
-  const municipiosActuales = MUNICIPIOS[deptoActual] ?? MUNICIPIOS['06'];
 
   return (
     <Modal
@@ -329,7 +333,11 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
               id={`${formId}-depto`}
               className={`input ${errors.departamento_cod ? 'input-error' : ''}`}
               {...register('departamento_cod', {
-                onChange: (e) => setDeptoActual(e.target.value),
+                onChange: (e) => {
+                  setDeptoActual(e.target.value);
+                  setValue('municipio_cod', '');
+                  setValue('distrito_cod', '');
+                },
               })}
             >
               {DEPARTAMENTOS.map((d) => (
@@ -339,24 +347,62 @@ const ModalEstablecimiento = ({ isOpen, onClose, onGuardar, establecimiento = nu
             {errors.departamento_cod && <p className="error-msg" role="alert">{errors.departamento_cod.message}</p>}
           </div>
 
-          {/* Municipio */}
+          {/* Municipio (CAT-013) */}
           <div>
             <label htmlFor={`${formId}-muni`} className="label">
               Municipio <span className="text-red-500" aria-hidden="true">*</span>
-              <span className="text-gray-400 font-normal ml-1 text-xs">(catálogo Hacienda)</span>
+              <span className="text-gray-400 font-normal ml-1 text-xs">(CAT-013, por departamento)</span>
             </label>
             <select
               id={`${formId}-muni`}
               className={`input ${errors.municipio_cod ? 'input-error' : ''}`}
+              disabled={!deptoActual || cargandoTerritorio}
               {...register('municipio_cod')}
             >
-              {municipiosActuales.map((m) => (
-                <option key={m.cod} value={m.cod}>{m.nombre}</option>
+              <option value="">{cargandoTerritorio ? 'Cargando catálogo…' : 'Seleccionar…'}</option>
+              {municipios.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
               ))}
             </select>
             {errors.municipio_cod && <p className="error-msg" role="alert">{errors.municipio_cod.message}</p>}
+            {municipioFueraDeCatalogo && (
+              <p className="error-msg" role="alert">
+                El código guardado ({municipioActual}) no existe en el catálogo CAT-013 para este departamento. Seleccioná el municipio correcto.
+              </p>
+            )}
+            {errorTerritorio && (
+              <p className="error-msg" role="alert">No se pudo cargar el catálogo de Hacienda. Reintentá en un momento.</p>
+            )}
             <p className="text-xs text-gray-400 mt-1">
-              Hacienda aún usa el catálogo de municipios — se actualizará cuando publiquen nuevos catálogos DTE.
+              Municipio según la nueva división territorial (ej: San Salvador Centro = 23).
+            </p>
+          </div>
+
+          {/* Distrito (CAT-008) */}
+          <div>
+            <label htmlFor={`${formId}-distrito`} className="label">
+              Distrito <span className="text-red-500" aria-hidden="true">*</span>
+              <span className="text-gray-400 font-normal ml-1 text-xs">(CAT-008, por departamento)</span>
+            </label>
+            <select
+              id={`${formId}-distrito`}
+              className={`input ${errors.distrito_cod ? 'input-error' : ''}`}
+              disabled={!deptoActual || cargandoTerritorio}
+              {...register('distrito_cod')}
+            >
+              <option value="">{cargandoTerritorio ? 'Cargando catálogo…' : 'Seleccionar…'}</option>
+              {distritos.map((d) => (
+                <option key={d.value} value={d.value}>{d.label}</option>
+              ))}
+            </select>
+            {errors.distrito_cod && <p className="error-msg" role="alert">{errors.distrito_cod.message}</p>}
+            {distritoFueraDeCatalogo && (
+              <p className="error-msg" role="alert">
+                El código guardado ({distritoActual}) no existe en el catálogo CAT-008 para este departamento. Seleccioná el distrito correcto.
+              </p>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              Distrito según el catálogo vigente (ej: San Salvador = 14). El MH lo exige junto al municipio.
             </p>
           </div>
 

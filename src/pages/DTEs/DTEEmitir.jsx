@@ -79,6 +79,7 @@ const schemaCCF = schemaBase.extend({
   rec_telefono:      z.string().optional().or(z.literal('')),
   rec_depto:         z.string().optional(),
   rec_municipio:     z.string().optional(),
+  rec_distrito:      z.string().optional(),
 });
 
 const schemaFSE = schemaBase.extend({
@@ -100,6 +101,7 @@ const schemaNCND = schemaBase.extend({
   rec_telefono:      z.string().optional().or(z.literal('')),
   rec_depto:         z.string().optional(),
   rec_municipio:     z.string().optional(),
+  rec_distrito:      z.string().optional(),
   doc_rel_codgen:    z.string().min(1, 'Selecciona el DTE relacionado.'),
   doc_rel_tipo:      z.string().min(1, 'Tipo de DTE requerido.'),
   doc_rel_fecha:     z.string().min(1, 'Fecha de emisión requerida.'),
@@ -191,7 +193,7 @@ const DTEEmitir = () => {
       } else {
         campos.push('rec_nombre', 'rec_nit', 'rec_correo', 'rec_telefono');
         if (esCCF || esNCND) {
-          campos.push('rec_nrc', 'rec_cod_actividad', 'rec_desc_actividad', 'rec_depto', 'rec_municipio');
+          campos.push('rec_nrc', 'rec_cod_actividad', 'rec_desc_actividad', 'rec_depto', 'rec_municipio', 'rec_distrito');
         }
         if (tipoDte === '14') campos.push('observaciones');
       }
@@ -244,6 +246,7 @@ const DTEEmitir = () => {
       if (receptorCliente.telefono)        setValue('rec_telefono', receptorCliente.telefono);
       if (receptorCliente.departamento_cod) setValue('rec_depto', receptorCliente.departamento_cod);
       if (receptorCliente.municipio_cod)   setValue('rec_municipio', receptorCliente.municipio_cod);
+      if (receptorCliente.distrito_cod)    setValue('rec_distrito', receptorCliente.distrito_cod);
     }
   }, [tipoDte, setValue]);
 
@@ -281,6 +284,7 @@ const DTEEmitir = () => {
           telefono:       datos.rec_telefono       || null,
           departamento_cod: datos.rec_depto        || null,
           municipio_cod:  datos.rec_municipio      || null,
+          distrito_cod:   datos.rec_distrito       || null,
         };
       } else if (tipoDte === '14') {
         receptor = {
@@ -380,6 +384,7 @@ const DTEEmitir = () => {
                   register={register}
                   errors={errors}
                   control={control}
+                  setValue={setValue}
                   tiposDoc={tiposDoc}
                   departamentos={departamentos}
                   onSeleccionarCliente={onSeleccionarCliente}

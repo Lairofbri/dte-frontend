@@ -100,6 +100,7 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
         telefono:       cliente.telefono       || null,
         departamento_cod: cliente.departamento_cod || null,
         municipio_cod:  cliente.municipio_cod  || null,
+        distrito_cod:   cliente.distrito_cod   || null,
         direccion:      cliente.direccion      || null,
       };
     } else if (tipoDte === '14') {

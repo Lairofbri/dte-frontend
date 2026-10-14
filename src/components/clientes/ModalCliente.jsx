@@ -10,6 +10,7 @@ import { z }           from 'zod';
 
 import Modal  from '../ui/Modal';
 import Button from '../ui/Button';
+import { useTerritorio } from '../../hooks/useTerritorio';
 
 const TIPOS_DOC = [
   { value: '13', label: 'DUI' },
@@ -48,6 +49,7 @@ const schema = z.object({
   desc_actividad:   z.string().optional().or(z.literal('')),
   departamento_cod: z.string().optional().nullable(),
   municipio_cod:    z.string().optional().or(z.literal('')),
+  distrito_cod:     z.string().optional().or(z.literal('')),
   direccion:        z.string().max(250).optional().or(z.literal('')),
   telefono:         z.string().optional().or(z.literal('')),
   correo:           z.string().email('Email inválido.').optional().or(z.literal('')),
@@ -83,9 +85,14 @@ const schema = z.object({
     ctx.addIssue({ code: z.ZodIssueCode.custom,
       message: 'Selecciona el tipo de documento.', path: ['tipo_documento'] });
   }
-  if (data.municipio_cod?.trim() && !data.departamento_cod) {
+  // Dirección fiscal del receptor: departamento + municipio (CAT-013) +
+  // distrito (CAT-008) van juntos — el MH exige los tres completos cuando se
+  // envía la dirección del receptor (CCF/NC/ND).
+  const tieneAlgunTerritorio = !!(data.departamento_cod || data.municipio_cod?.trim() || data.distrito_cod?.trim());
+  const tieneTodoTerritorio  = !!(data.departamento_cod && data.municipio_cod?.trim() && data.distrito_cod?.trim());
+  if (tieneAlgunTerritorio && !tieneTodoTerritorio) {
     ctx.addIssue({ code: z.ZodIssueCode.custom,
-      message: 'Selecciona el departamento primero.', path: ['municipio_cod'] });
+      message: 'Completá departamento, municipio y distrito (catálogos Hacienda).', path: ['municipio_cod'] });
   }
 });
 
@@ -117,10 +124,12 @@ const ModalCliente = ({ isOpen, onClose, onGuardar, cliente = null }) => {
   const esJuridico      = tipoCliente === 'juridico';
   const esNatural       = tipoCliente === 'natural';
 
-  // Limpiar municipio si se cambia departamento
-  useEffect(() => {
-    if (!departamentoCod) setValue('municipio_cod', '');
-  }, [departamentoCod, setValue]);
+  // Catálogos territoriales oficiales del departamento (CAT-013/CAT-008).
+  const {
+    municipios, distritos,
+    cargando: cargandoTerritorio,
+    error:    errorTerritorio,
+  } = useTerritorio(departamentoCod);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -138,6 +147,7 @@ const ModalCliente = ({ isOpen, onClose, onGuardar, cliente = null }) => {
         desc_actividad:   cliente?.desc_actividad   ?? '',
         departamento_cod: cliente?.departamento_cod ?? null,
         municipio_cod:    cliente?.municipio_cod    ?? '',
+        distrito_cod:     cliente?.distrito_cod     ?? '',
         direccion:        cliente?.direccion        ?? '',
         telefono:         cliente?.telefono         ?? '',
         correo:           cliente?.correo           ?? '',
@@ -309,7 +319,9 @@ const ModalCliente = ({ isOpen, onClose, onGuardar, cliente = null }) => {
             <Field id={`${formId}-depto`} label="Departamento"
               error={errors.departamento_cod?.message}>
               <select id={`${formId}-depto`} className="input"
-                {...register('departamento_cod')}>
+                {...register('departamento_cod', {
+                  onChange: () => { setValue('municipio_cod', ''); setValue('distrito_cod', ''); },
+                })}>
                 <option value="">Seleccionar...</option>
                 {DEPARTAMENTOS.map(d => (
                   <option key={d.cod} value={d.cod}>{d.nombre}</option>
@@ -317,14 +329,34 @@ const ModalCliente = ({ isOpen, onClose, onGuardar, cliente = null }) => {
               </select>
             </Field>
             <Field id={`${formId}-muni`}
-              label="Código de municipio (CAT-013)"
+              label="Municipio (CAT-013)"
               error={errors.municipio_cod?.message}
-              note={!departamentoCod ? 'Selecciona el departamento primero' : ''}>
-              <input id={`${formId}-muni`} type="text"
-                className={`input font-mono ${errors.municipio_cod ? 'input-error' : ''}`}
-                placeholder="Ej: 23"
-                disabled={!departamentoCod}
-                {...register('municipio_cod')} />
+              note={!departamentoCod
+                ? 'Selecciona el departamento primero'
+                : (errorTerritorio ? 'No se pudo cargar el catálogo. Reintentá.' : '')}>
+              <select id={`${formId}-muni`}
+                className={`input ${errors.municipio_cod ? 'input-error' : ''}`}
+                disabled={!departamentoCod || cargandoTerritorio}
+                {...register('municipio_cod')}>
+                <option value="">{cargandoTerritorio ? 'Cargando catálogo…' : 'Seleccionar...'}</option>
+                {municipios.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field id={`${formId}-distrito`}
+              label="Distrito (CAT-008)"
+              error={errors.distrito_cod?.message}
+              note={departamentoCod ? 'Los municipios antiguos (ej: San Salvador = 14).' : ''}>
+              <select id={`${formId}-distrito`}
+                className={`input ${errors.distrito_cod ? 'input-error' : ''}`}
+                disabled={!departamentoCod || cargandoTerritorio}
+                {...register('distrito_cod')}>
+                <option value="">{cargandoTerritorio ? 'Cargando catálogo…' : 'Seleccionar...'}</option>
+                {distritos.map((d) => (
+                  <option key={d.value} value={d.value}>{d.label}</option>
+                ))}
+              </select>
             </Field>
             <div className="sm:col-span-2">
               <Field id={`${formId}-dir`} label="Dirección (complemento)">

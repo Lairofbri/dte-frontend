@@ -5,8 +5,9 @@
 // FSE: NIT + nombre. NC/ND incluyen el documento relacionado.
 
 import { Info, ChevronDown, UserRound, Store } from 'lucide-react';
-import { Controller } from 'react-hook-form';
+import { Controller, useWatch } from 'react-hook-form';
 import { cn } from '@/lib/utils';
+import { useTerritorio } from '../../../hooks/useTerritorio';
 import { Alert, AlertTitle, AlertDescription } from '@/components/shadcn/alert';
 import { Button } from '@/components/shadcn/button';
 import { Input } from '@/components/shadcn/input';
@@ -24,7 +25,7 @@ const LIMITE_FCF_SIN_DATOS = 1095;
 
 const Paso2Receptor = ({
   tipoDte, esCCF, esFSE, esNCND,
-  register, errors, control,
+  register, errors, control, setValue,
   tiposDoc, departamentos,
   onSeleccionarCliente,
   fcfConDatos, onSetFcfConDatos,
@@ -32,6 +33,15 @@ const Paso2Receptor = ({
 }) => {
   const requiereNit = esCCF || esFSE || esNCND;
   const requiereNombre = requiereNit;
+
+  // Catálogos territoriales del departamento del receptor (CAT-013/CAT-008)
+  const deptoReceptor = useWatch({ control, name: 'rec_depto' });
+  const {
+    municipios: municipiosReceptor,
+    distritos:  distritosReceptor,
+    cargando:   cargandoTerritorio,
+    error:      errorTerritorio,
+  } = useTerritorio(deptoReceptor);
 
   return (
     <div className="space-y-5">
@@ -230,7 +240,14 @@ const Paso2Receptor = ({
                 name="rec_depto"
                 control={control}
                 render={({ field }) => (
-                  <Select value={field.value || undefined} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value || undefined}
+                    onValueChange={(valor) => {
+                      field.onChange(valor);
+                      setValue('rec_municipio', '');
+                      setValue('rec_distrito', '');
+                    }}
+                  >
                     <SelectTrigger id="rec-depto"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                     <SelectContent>
                       {departamentos.map((d) => (
@@ -241,8 +258,53 @@ const Paso2Receptor = ({
                 )}
               />
             </FormField>
-            <FormField label="Distrito (municipio — CAT-013)" htmlFor="rec-municipio">
-              <Input id="rec-municipio" className="font-mono" placeholder="Ej: 23 = San Salvador Centro" {...register('rec_municipio')} />
+            <FormField
+              label="Municipio (CAT-013)"
+              htmlFor="rec-municipio"
+              error={errorTerritorio ? 'No se pudo cargar el catálogo. Reintentá.' : undefined}
+            >
+              <Controller
+                name="rec_municipio"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value || undefined}
+                    onValueChange={field.onChange}
+                    disabled={!deptoReceptor || cargandoTerritorio}
+                  >
+                    <SelectTrigger id="rec-municipio">
+                      <SelectValue placeholder={cargandoTerritorio ? 'Cargando catálogo…' : 'Seleccionar...'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {municipiosReceptor.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </FormField>
+            <FormField label="Distrito (CAT-008)" htmlFor="rec-distrito">
+              <Controller
+                name="rec_distrito"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value || undefined}
+                    onValueChange={field.onChange}
+                    disabled={!deptoReceptor || cargandoTerritorio}
+                  >
+                    <SelectTrigger id="rec-distrito">
+                      <SelectValue placeholder={cargandoTerritorio ? 'Cargando catálogo…' : 'Seleccionar...'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {distritosReceptor.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </FormField>
           </CollapsibleContent>
         </Collapsible>

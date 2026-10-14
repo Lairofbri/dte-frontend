@@ -9,6 +9,7 @@ import { Plus, RefreshCw, Pencil } from 'lucide-react';
 import { useEstadoProvision } from '../hooks/useEstadoProvision';
 import { useAuthStore, selectEsPlataforma } from '../store/auth.store';
 import { obtenerCatalogoApi } from '../api/catalogos.api';
+import { useTerritorio } from '../hooks/useTerritorio';
 import { BadgeGenerico }      from '../components/ui/Badge';
 import Table                  from '../components/ui/Table';
 import Button                 from '../components/ui/Button';
@@ -64,7 +65,7 @@ const Onboarding = () => {
     email_admin: '', password: '', confirmar_password: '',
     nombre_usuario: '', apellido: '',
     crearPos: false, pin: '',
-    est_nombre: '', est_direccion: '', est_departamento_cod: '', est_municipio_cod: '',
+    est_nombre: '', est_direccion: '', est_departamento_cod: '', est_municipio_cod: '', est_distrito_cod: '',
     est_cod_estable_mh: '', est_cod_punto_venta_mh: '',
   });
   const [errorForm, setErrorForm] = useState(null);
@@ -78,6 +79,15 @@ const Onboarding = () => {
       .catch(() => { if (!cancelado) setDepartamentos([]); });
     return () => { cancelado = true; };
   }, []);
+
+  // Catálogos territoriales oficiales del departamento elegido para el
+  // establecimiento inicial (municipio CAT-013 / distrito CAT-008).
+  const {
+    municipios: municipiosEmpresa,
+    distritos:  distritosEmpresa,
+    cargando:   cargandoTerritorioEmpresa,
+    error:      errorTerritorioEmpresa,
+  } = useTerritorio(form.est_departamento_cod);
 
   // Edición (2026-10-10) — solo rol plataforma. El NIT es inmutable.
   const [tenantEditando, setTenantEditando] = useState(null);
@@ -93,7 +103,7 @@ const Onboarding = () => {
       email_admin: '', password: '', confirmar_password: '',
       nombre_usuario: '', apellido: '',
       crearPos: false, pin: '',
-      est_nombre: '', est_direccion: '', est_departamento_cod: '', est_municipio_cod: '',
+      est_nombre: '', est_direccion: '', est_departamento_cod: '', est_municipio_cod: '', est_distrito_cod: '',
       est_cod_estable_mh: '', est_cod_punto_venta_mh: '',
     });
     setErrorForm(null);
@@ -163,7 +173,11 @@ const Onboarding = () => {
       return;
     }
     if (!/^\d{2}$/.test(form.est_municipio_cod.trim())) {
-      setErrorForm('El código de municipio debe tener 2 dígitos (del documento de Hacienda).');
+      setErrorForm('Selecciona el municipio del establecimiento (catálogo CAT-013).');
+      return;
+    }
+    if (!/^\d{2}$/.test(form.est_distrito_cod.trim())) {
+      setErrorForm('Selecciona el distrito del establecimiento (catálogo CAT-008).');
       return;
     }
     if (!/^[A-Z0-9]{4}$/.test(form.est_cod_estable_mh.trim().toUpperCase())) {
@@ -184,6 +198,7 @@ const Onboarding = () => {
           direccion:          form.est_direccion,
           departamento_cod:   form.est_departamento_cod,
           municipio_cod:      form.est_municipio_cod,
+          distrito_cod:       form.est_distrito_cod,
           cod_estable_mh:     form.est_cod_estable_mh,
           cod_punto_venta_mh: form.est_cod_punto_venta_mh,
         },
@@ -425,7 +440,7 @@ const Onboarding = () => {
                   onChange={(e) => setForm((p) => ({ ...p, est_direccion: e.target.value }))}
                   placeholder="Dirección exacta de la sucursal"
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="label" htmlFor="est-departamento">
                       Departamento <span className="text-red-500 ml-1" aria-hidden="true">*</span>
@@ -434,7 +449,12 @@ const Onboarding = () => {
                       id="est-departamento"
                       className="input"
                       value={form.est_departamento_cod}
-                      onChange={(e) => setForm((p) => ({ ...p, est_departamento_cod: e.target.value }))}
+                      onChange={(e) => setForm((p) => ({
+                        ...p,
+                        est_departamento_cod: e.target.value,
+                        est_municipio_cod: '',
+                        est_distrito_cod: '',
+                      }))}
                     >
                       <option value="">Seleccionar...</option>
                       {departamentos.map((d) => (
@@ -444,16 +464,46 @@ const Onboarding = () => {
                       ))}
                     </select>
                   </div>
-                  <Input
-                    label="Código de municipio"
-                    required
-                    value={form.est_municipio_cod}
-                    onChange={(e) => setForm((p) => ({ ...p, est_municipio_cod: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
-                    placeholder="2 dígitos (00-99)"
-                    maxLength={2}
-                    helperText="Del documento de acreditamiento de Hacienda."
-                  />
+                  <div>
+                    <label className="label" htmlFor="est-municipio">
+                      Municipio (CAT-013) <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                    </label>
+                    <select
+                      id="est-municipio"
+                      className="input"
+                      value={form.est_municipio_cod}
+                      disabled={!form.est_departamento_cod || cargandoTerritorioEmpresa}
+                      onChange={(e) => setForm((p) => ({ ...p, est_municipio_cod: e.target.value }))}
+                    >
+                      <option value="">{cargandoTerritorioEmpresa ? 'Cargando catálogo…' : 'Seleccionar...'}</option>
+                      {municipiosEmpresa.map((m) => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="est-distrito">
+                      Distrito (CAT-008) <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                    </label>
+                    <select
+                      id="est-distrito"
+                      className="input"
+                      value={form.est_distrito_cod}
+                      disabled={!form.est_departamento_cod || cargandoTerritorioEmpresa}
+                      onChange={(e) => setForm((p) => ({ ...p, est_distrito_cod: e.target.value }))}
+                    >
+                      <option value="">{cargandoTerritorioEmpresa ? 'Cargando catálogo…' : 'Seleccionar...'}</option>
+                      {distritosEmpresa.map((d) => (
+                        <option key={d.value} value={d.value}>{d.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
+                {errorTerritorioEmpresa && (
+                  <p className="text-sm text-red-600" role="alert">
+                    No se pudieron cargar los catálogos territoriales de Hacienda (municipio/distrito). Reintentá en un momento.
+                  </p>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
                     label="Código establecimiento (MH)"
