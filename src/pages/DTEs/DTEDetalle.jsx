@@ -125,10 +125,9 @@ const DTEDetalle = () => {
 
   if (!dte) return null;
 
-  // URL de consulta pública de Hacienda para el QR
-  const urlConsultaHacienda = dte.sello_recepcion
-    ? `https://admin.factura.gob.sv/consultaPublica?ambiente=${dte.ambiente}&codGen=${dte.codigo_generacion}&fechaEmi=${dte.fecha_emision}`
-    : null;
+  // URL de consulta pública de Hacienda para el QR.
+  // La arma el backend (fechaEmi en YYYY-MM-DD, formato oficial del MH).
+  const urlConsultaHacienda = dte.qr_url ?? null;
 
   const puedeAnular = dte.estado === 'aceptado';
 

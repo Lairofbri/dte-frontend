@@ -18,9 +18,19 @@ export const formatMonto = (monto) => {
 /**
  * Formatea una fecha ISO a formato legible
  * Ej: "2026-05-10T06:38:32.025Z" → "10/05/2026"
+ * Ej: "2026-10-14" (date-only) → "14/10/2026"
  */
 export const formatFecha = (fecha) => {
   if (!fecha) return '—';
+
+  // 'YYYY-MM-DD' (date-only): formatear por partes — new Date() lo
+  // interpretaría como UTC medianoche y en UTC-6 mostraría el día anterior
+  // (bug 2026-10-14: un DTE emitido el 14/10 00:09 se mostraba 13/10).
+  const soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha));
+  if (soloFecha) {
+    return `${soloFecha[3]}/${soloFecha[2]}/${soloFecha[1]}`;
+  }
+
   const d = new Date(fecha);
   if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('es-SV', {
