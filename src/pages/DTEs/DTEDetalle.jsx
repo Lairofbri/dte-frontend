@@ -1,18 +1,22 @@
 // src/pages/DTEs/DTEDetalle.jsx
 // Detalle completo de un DTE con timeline, QR y opción de anulación
 
-import { useState }       from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { QRCodeSVG }      from 'qrcode.react';
+import { toast }          from 'react-hot-toast';
 import {
   ArrowLeft, XCircle, RefreshCw,
-  CheckCircle, Clock, Send, FileX,
+  CheckCircle, Clock, Send, FileX, Printer,
 } from 'lucide-react';
 import { useDTEDetalle }  from '../../hooks/useDTEDetalle';
 import ModalAnulacion     from '../../components/dtes/ModalAnulacion';
 import Badge              from '../../components/ui/Badge';
 import Button             from '../../components/ui/Button';
 import Spinner            from '../../components/ui/Spinner';
+import {
+  obtenerConfigAgente, imprimirTicketDte, agenteConfigurado, esErrorImpresion,
+} from '../../services/printingService';
 import {
   formatMonto,
   formatFecha,
@@ -91,10 +95,60 @@ const TimelineDTE = ({ estado }) => {
 const DTEDetalle = () => {
   const { codigo }  = useParams();
   const navigate    = useNavigate();
+  const location    = useLocation();
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [imprimiendo, setImprimiendo]   = useState(false);
+  // La auto-impresión se dispara una sola vez por emisión (el estado de
+  // navegación se consume al imprimir: recargar o volver atrás no reimprime).
+  const autoImpresoRef = useRef(false);
 
   // Todos los hooks ANTES de cualquier return condicional
   const { dte, isLoading, error, anulando, recargar, anular } = useDTEDetalle(codigo);
+
+  /**
+   * Imprime el comprobante fiscal por el agente local. No emite ni modifica
+   * nada: el backend rechaza con 409 un DTE que no esté aceptado y la emisión
+   * nunca se revierte por un fallo de impresión (verificar.txt §5/§12).
+   */
+  const imprimir = useCallback(async ({ respetarAuto = false } = {}) => {
+    if (!dte?.codigo_generacion) return;
+
+    const config = await obtenerConfigAgente().catch(() => null);
+
+    if (respetarAuto) {
+      // Sin token configurado o con la auto-impresión apagada no se intenta:
+      // el usuario puede imprimir a mano desde el botón.
+      if (!agenteConfigurado()) return;
+      if (!config?.impresion?.autoImpresion) return;
+    }
+
+    setImprimiendo(true);
+    try {
+      const resultado = await imprimirTicketDte(dte.codigo_generacion, {
+        papelMm: config?.impresion?.papelMm,
+      });
+      toast.success(`Comprobante enviado a impresión (${resultado.bytes} bytes).`);
+    } catch (err) {
+      toast.error(
+        esErrorImpresion(err)
+          ? err.message
+          : 'No se pudo enviar el comprobante a la impresora.',
+      );
+    } finally {
+      setImprimiendo(false);
+    }
+  }, [dte]);
+
+  useEffect(() => {
+    if (!dte || autoImpresoRef.current) return;
+    if (!location.state?.imprimirAlEmitir) return;
+
+    autoImpresoRef.current = true;
+    navigate(location.pathname, { replace: true, state: null });
+    // Diferido para no llamar setState de forma sincrónica dentro del efecto.
+    const temporizador = setTimeout(() => void imprimir({ respetarAuto: true }), 0);
+    return () => clearTimeout(temporizador);
+  }, [dte, location.state, location.pathname, navigate, imprimir]);
 
   if (isLoading) {
     return (
@@ -150,6 +204,16 @@ const DTEDetalle = () => {
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <Badge estado={dte.estado} />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void imprimir()}
+            isLoading={imprimiendo}
+            ariaLabel="Imprimir el comprobante fiscal en la impresora térmica"
+          >
+            <Printer className="w-4 h-4" aria-hidden="true" />
+            Imprimir
+          </Button>
           {puedeAnular && (
             <Button
               variant="danger"

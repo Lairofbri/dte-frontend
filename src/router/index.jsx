@@ -13,6 +13,7 @@ import DTEListado      from '../pages/DTEs/DTEListado';
 import DTEDetalle      from '../pages/DTEs/DTEDetalle';
 import DTEEmitir       from '../pages/DTEs/DTEEmitir';
 import Configuracion   from '../pages/Configuracion';
+import Impresion       from '../pages/Impresion';
 import Establecimientos from '../pages/Establecimientos';
 import SeleccionarSucursal from '../pages/SeleccionarSucursal';
 import Usuarios        from '../pages/Usuarios';
@@ -69,6 +70,10 @@ const router = createBrowserRouter([
       {
         path:    'configuracion',
         element: <AdminRoute><Configuracion /></AdminRoute>,
+      },
+      {
+        path:    'impresion',
+        element: <AdminRoute><Impresion /></AdminRoute>,
       },
       {
         path:    'establecimientos',

@@ -8,7 +8,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, AlertTriangle, ReceiptText,
   Settings, Building2, Users, ClipboardList, UserSquare2,
-  Rocket, ChevronLeft, ChevronRight, ChevronDown, Package,
+  Rocket, ChevronLeft, ChevronRight, ChevronDown, Package, Printer,
 } from 'lucide-react';
 import { useAuthStore, selectEsAdmin, selectEsPlataforma, selectUsuario, selectEstablecimientoSeleccionado, obtenerRoles } from '../../store/auth.store';
 
@@ -30,6 +30,7 @@ const dteSubmenu = [
 // Usuarios, Auditoría) excepto este mantenimiento.
 const menuAdministracion = [
   { label: 'Configuración',    path: '/configuracion',    icon: Settings      },
+  { label: 'Impresión',        path: '/impresion',        icon: Printer       },
   { label: 'Establecimientos', path: '/establecimientos', icon: Building2     },
   { label: 'Usuarios',         path: '/usuarios',         icon: Users         },
   { label: 'Onboarding',       path: '/onboarding',       icon: Rocket, plataforma: true },
