@@ -1,20 +1,22 @@
 // src/components/clientes/SelectorCliente.jsx
-// Combobox async de clientes para el emisor de DTE.
+// Select box (combobox) de clientes guardados para el emisor de DTE (paso 2).
 //
-// - Debounce 350 ms + guard de carrera (patrón del proyecto, sin React Query).
-// - Muestra «Nombre — DUI/NIT»: dos clientes pueden compartir nombre, pero
-//   nunca el documento; el documento evita elegir al homónimo equivocado.
-// - Al seleccionar, construye el receptor completo según el tipo de DTE
-//   (receptorDeCliente) para que el formulario se llene con TODOS los datos
-//   guardados del cliente.
+// Es un select con buscador integrado: al abrirlo muestra TODOS los clientes
+// guardados (no hace falta escribir) y, al tipear, filtra server-side (debounce
+// + guard de carrera, patrón del proyecto, sin React Query).
+//
+// Muestra «Nombre — DUI/NIT»: dos clientes pueden compartir nombre, pero nunca
+// el documento; el documento evita elegir al homónimo equivocado. Al seleccionar
+// construye el receptor completo según el tipo de DTE (receptorDeCliente) para
+// que el formulario se llene con TODOS los datos guardados del cliente.
 
 import { useState, useEffect, useRef, useId, useCallback, useMemo } from 'react';
-import { Search, X, Loader2, UserPlus } from 'lucide-react';
+import { Check, ChevronDown, Loader2, Search, UserPlus, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/shadcn/input';
-import { Button } from '@/components/shadcn/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/shadcn/popover';
 import { buscarClientesApi, crearClienteApi } from '../../api/clientes.api';
 import ModalCliente from './ModalCliente';
 import {
@@ -22,64 +24,47 @@ import {
   preferenciaParaDte, filtroSugeridoDte, tipoClienteSugeridoDte,
 } from './tiposCliente';
 
+// Texto del trigger según el tipo de DTE activo
 const PLACEHOLDER_POR_DTE = {
-  '03': 'Buscar empresa (nombre, NIT, NRC)…',
-  '05': 'Buscar empresa (nombre, NIT, NRC)…',
-  '06': 'Buscar empresa (nombre, NIT, NRC)…',
-  '14': 'Buscar sujeto excluido (nombre, DUI, NIT)…',
+  '03': 'Seleccionar empresa…',
+  '05': 'Seleccionar empresa…',
+  '06': 'Seleccionar empresa…',
+  '14': 'Seleccionar sujeto excluido…',
 };
-const PLACEHOLDER_DEFAULT = 'Buscar cliente (nombre, DUI, NIT)…';
+const PLACEHOLDER_DEFAULT = 'Seleccionar cliente…';
 
-const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
-  const inputId   = useId();
+const LIMITE_CLIENTES = 50;
+
+const SelectorCliente = ({ tipoDte, onSeleccionar }) => {
   const listboxId = useId();
+  const searchRef = useRef(null);
 
-  const [busqueda,     setBusqueda]     = useState(valorActual);
+  const [busqueda,     setBusqueda]     = useState('');
   const [resultados,   setResultados]   = useState([]);
   const [isLoading,    setIsLoading]    = useState(false);
   const [abierto,      setAbierto]      = useState(false);
   const [clienteSelec, setClienteSelec] = useState(null);
   const [modalNuevo,   setModalNuevo]   = useState(false);
   const [activoIdx,    setActivoIdx]    = useState(-1);
-  const wrapperRef = useRef(null);
 
-  // Cerrar al hacer click fuera
+  // Carga TODOS los clientes al abrir y filtra server-side al escribir
+  // (debounce + guard de carrera).
   useEffect(() => {
-    const handler = (e) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
-        setAbierto(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const resultadosOrdenados = useMemo(
-    () => [...resultados].sort(
-      (a, b) => preferenciaParaDte(a, tipoDte) - preferenciaParaDte(b, tipoDte)
-    ),
-    [resultados, tipoDte]
-  );
-  const resultadosVisibles = busqueda.trim() ? resultadosOrdenados : [];
-  const abiertoVisible     = abierto && !clienteSelec && busqueda.trim().length > 0;
-
-  // Búsqueda con debounce + guard de carrera
-  useEffect(() => {
-    if (clienteSelec) return; // Ya seleccionado — no buscar
-    if (!busqueda.trim()) return;
+    if (!abierto) return;
 
     let cancelado = false;
+    const termino = busqueda.trim();
 
     const timer = setTimeout(async () => {
       setIsLoading(true);
       try {
-        const params = { q: busqueda.trim(), limite: 8 };
+        const params = { limite: LIMITE_CLIENTES };
+        if (termino) params.q = termino;
         const filtro = filtroSugeridoDte(tipoDte);
         if (filtro) params.tipo_cliente = filtro;
         const datos = await buscarClientesApi(params);
         if (!cancelado) {
           setResultados(datos?.clientes ?? []);
-          setAbierto(true);
           setActivoIdx(-1);
         }
       } catch {
@@ -87,46 +72,47 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
       } finally {
         if (!cancelado) setIsLoading(false);
       }
-    }, 350);
+    }, termino ? 300 : 0);
 
     return () => { cancelado = true; clearTimeout(timer); };
-  }, [busqueda, tipoDte, clienteSelec]);
+  }, [abierto, busqueda, tipoDte]);
+
+  const resultadosOrdenados = useMemo(
+    () => [...resultados].sort(
+      (a, b) => preferenciaParaDte(a, tipoDte) - preferenciaParaDte(b, tipoDte)
+    ),
+    [resultados, tipoDte]
+  );
 
   const seleccionar = useCallback((cliente) => {
     setClienteSelec(cliente);
     setBusqueda('');
-    setResultados([]);
     setAbierto(false);
     setActivoIdx(-1);
     onSeleccionar(receptorDeCliente(cliente, tipoDte), cliente.id);
   }, [tipoDte, onSeleccionar]);
 
-  const limpiar = () => {
+  const limpiar = (e) => {
+    e?.stopPropagation();
     setClienteSelec(null);
     setBusqueda('');
     setResultados([]);
-    setAbierto(false);
     setActivoIdx(-1);
     onSeleccionar(null, null);
   };
 
-  // Navegación con teclado
+  // Navegación con teclado dentro del listado
   const onKeyDown = (e) => {
-    if (!abiertoVisible || resultadosVisibles.length === 0) {
-      if (e.key === 'Escape') setAbierto(false);
-      return;
-    }
+    if (resultadosOrdenados.length === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActivoIdx((p) => Math.min(p + 1, resultadosVisibles.length - 1));
+      setActivoIdx((p) => Math.min(p + 1, resultadosOrdenados.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActivoIdx((p) => Math.max(p - 1, 0));
     } else if (e.key === 'Enter' && activoIdx >= 0) {
       e.preventDefault();
-      seleccionar(resultadosVisibles[activoIdx]);
-    } else if (e.key === 'Escape') {
-      setAbierto(false);
+      seleccionar(resultadosOrdenados[activoIdx]);
     }
   };
 
@@ -143,84 +129,129 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
     [busqueda, tipoDte]
   );
 
+  const metaSeleccion = clienteSelec ? getTipoCliente(clienteSelec.tipo_cliente) : null;
+  const IconoSeleccion = metaSeleccion?.icono;
+
   return (
-    <div ref={wrapperRef} className="relative space-y-2">
-      {/* Input de búsqueda */}
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        <Input
-          id={inputId}
-          type="text"
-          role="combobox"
-          aria-expanded={abiertoVisible}
-          aria-controls={listboxId}
-          aria-autocomplete="list"
-          aria-activedescendant={activoIdx >= 0 ? `${listboxId}-${activoIdx}` : undefined}
-          value={busqueda}
-          onChange={(e) => {
-            setBusqueda(e.target.value);
-            if (clienteSelec) setClienteSelec(null);
-          }}
-          onFocus={() => { if (!clienteSelec && resultadosVisibles.length > 0) setAbierto(true); }}
-          onKeyDown={onKeyDown}
-          placeholder={PLACEHOLDER_POR_DTE[tipoDte] || PLACEHOLDER_DEFAULT}
-          className="h-10 pl-9 pr-16"
-          autoComplete="off"
-        />
+    <div className="relative">
+      <Popover
+        open={abierto}
+        onOpenChange={(open) => {
+          setAbierto(open);
+          if (open) setBusqueda(''); // al abrir, mostrar todos
+        }}
+      >
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            role="combobox"
+            aria-expanded={abierto}
+            aria-haspopup="listbox"
+            aria-controls={listboxId}
+            className={cn(
+              'flex h-10 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              clienteSelec ? 'pr-14' : 'pr-3'
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              {clienteSelec ? (
+                <>
+                  <span className={cn('flex size-5 shrink-0 items-center justify-center rounded bg-gradient-to-br ring-1', metaSeleccion.acento)}>
+                    <IconoSeleccion className="size-3" aria-hidden="true" />
+                  </span>
+                  <span className="truncate font-medium text-foreground">{etiquetaCliente(clienteSelec)}</span>
+                </>
+              ) : (
+                <span className="truncate text-muted-foreground">
+                  {PLACEHOLDER_POR_DTE[tipoDte] || PLACEHOLDER_DEFAULT}
+                </span>
+              )}
+            </span>
+            <ChevronDown className="size-4 shrink-0 opacity-50" aria-hidden="true" />
+          </button>
+        </PopoverTrigger>
 
-        <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
-          {isLoading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden="true" />}
-          {clienteSelec && (
-            <button
-              type="button"
-              onClick={limpiar}
-              aria-label="Quitar cliente seleccionado"
-              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <X className="size-4" aria-hidden="true" />
-            </button>
-          )}
-        </div>
-      </div>
+        {/* Quitar selección (fuera del trigger para no anidar botones) */}
+        {clienteSelec && (
+          <button
+            type="button"
+            onClick={limpiar}
+            aria-label="Quitar cliente seleccionado"
+            className="absolute right-8 top-1/2 z-10 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <X className="size-3.5" aria-hidden="true" />
+          </button>
+        )}
 
-      {/* Chip del cliente seleccionado */}
-      {clienteSelec && <ChipSeleccionado cliente={clienteSelec} onLimpiar={limpiar} />}
-
-      {/* Dropdown */}
-      {abiertoVisible && (
-        <ul
-          id={listboxId}
-          role="listbox"
-          aria-label="Resultados de búsqueda de clientes"
-          className="absolute z-50 mt-1 w-full origin-top overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl duration-150 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2"
+        <PopoverContent
+          align="start"
+          className="w-[var(--radix-popover-trigger-width)] p-0"
+          onOpenAutoFocus={(e) => { e.preventDefault(); searchRef.current?.focus(); }}
         >
-          {resultadosVisibles.length === 0 ? (
-            <li className="px-4 py-6 text-center text-sm text-muted-foreground">
-              Sin resultados — ¿querés crear este cliente?
-            </li>
-          ) : (
-            <li className="max-h-80 overflow-y-auto py-1">
-              <ul>
-                {resultadosVisibles.map((cliente, idx) => (
-                  <FilaResultado
-                    key={cliente.id}
-                    id={`${listboxId}-${idx}`}
-                    cliente={cliente}
-                    activo={activoIdx === idx}
-                    onSeleccionar={() => seleccionar(cliente)}
-                    onActivar={() => setActivoIdx(idx)}
-                  />
-                ))}
-              </ul>
-            </li>
-          )}
+          {/* Buscador integrado */}
+          <div className="border-b p-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
+                ref={searchRef}
+                type="text"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                onKeyDown={onKeyDown}
+                role="combobox"
+                aria-expanded={abierto}
+                aria-controls={listboxId}
+                aria-autocomplete="list"
+                aria-activedescendant={activoIdx >= 0 ? `${listboxId}-${activoIdx}` : undefined}
+                placeholder="Buscar por nombre, DUI o NIT…"
+                className="h-9 pl-9 pr-9"
+                autoComplete="off"
+              />
+              {isLoading && (
+                <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-hidden="true" />
+              )}
+            </div>
+          </div>
+
+          {/* Listado de clientes guardados */}
+          <ul
+            id={listboxId}
+            role="listbox"
+            aria-label="Clientes guardados"
+            className="max-h-72 overflow-y-auto py-1"
+          >
+            {isLoading && resultadosOrdenados.length === 0 ? (
+              <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                Cargando clientes…
+              </li>
+            ) : resultadosOrdenados.length === 0 ? (
+              <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                {busqueda.trim()
+                  ? 'Sin resultados — ¿querés crear este cliente?'
+                  : 'Todavía no hay clientes guardados.'}
+              </li>
+            ) : (
+              resultadosOrdenados.map((cliente, idx) => (
+                <FilaResultado
+                  key={cliente.id}
+                  id={`${listboxId}-${idx}`}
+                  cliente={cliente}
+                  activo={activoIdx === idx}
+                  seleccionado={clienteSelec?.id === cliente.id}
+                  onSeleccionar={() => seleccionar(cliente)}
+                  onActivar={() => setActivoIdx(idx)}
+                />
+              ))
+            )}
+          </ul>
 
           {/* Alta rápida */}
-          <li className="border-t border-border">
+          <div className="border-t border-border">
             <button
               type="button"
               onClick={() => { setAbierto(false); setModalNuevo(true); }}
-              className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-primary transition-colors hover:bg-accent"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-primary transition-colors hover:bg-accent"
             >
               <UserPlus className="size-4 shrink-0" aria-hidden="true" />
               <span>
@@ -228,9 +259,9 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
                 {busqueda.trim() && <span className="text-muted-foreground"> «{busqueda.trim()}»</span>}
               </span>
             </button>
-          </li>
-        </ul>
-      )}
+          </div>
+        </PopoverContent>
+      </Popover>
 
       {/* Modal de alta (crear) */}
       <ModalCliente
@@ -244,7 +275,7 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
 };
 
 // ── Fila de resultado ──
-const FilaResultado = ({ id, cliente, activo, onSeleccionar, onActivar }) => {
+const FilaResultado = ({ id, cliente, activo, seleccionado, onSeleccionar, onActivar }) => {
   const meta = getTipoCliente(cliente.tipo_cliente);
   const Icono = meta.icono;
   const documento = etiquetaDocumento(cliente);
@@ -282,37 +313,9 @@ const FilaResultado = ({ id, cliente, activo, onSeleccionar, onActivar }) => {
           {cliente.total_dtes} DTE{cliente.total_dtes !== 1 ? 's' : ''}
         </span>
       )}
+
+      {seleccionado && <Check className="size-4 shrink-0 text-primary" aria-hidden="true" />}
     </li>
-  );
-};
-
-// ── Chip del cliente seleccionado ──
-const ChipSeleccionado = ({ cliente, onLimpiar }) => {
-  const meta = getTipoCliente(cliente.tipo_cliente);
-  const Icono = meta.icono;
-
-  return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2">
-      <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ring-1', meta.acento)}>
-        <Icono className="size-4" aria-hidden="true" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">
-          {etiquetaCliente(cliente)}
-        </p>
-        <p className="truncate text-xs text-muted-foreground">{meta.etiqueta}</p>
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={onLimpiar}
-        aria-label="Quitar cliente seleccionado"
-        className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-      >
-        <X className="size-4" aria-hidden="true" />
-      </Button>
-    </div>
   );
 };
 

@@ -115,12 +115,14 @@ const Paso2Receptor = ({
         </ToggleGroup>
       )}
 
-      {/* ── Buscador de clientes guardados ── */}
+      {/* ── Select box de clientes guardados (con buscador) ── */}
       {!(tipoDte === '01' && !fcfConDatos) && (
         <div className="space-y-2">
           <p className="text-sm font-medium text-foreground">Cliente guardado</p>
-          <SelectorCliente tipoDte={tipoDte} valorActual="" onSeleccionar={onSeleccionarCliente} />
-          <p className="text-xs text-muted-foreground">O completá los campos manualmente.</p>
+          <SelectorCliente tipoDte={tipoDte} onSeleccionar={onSeleccionarCliente} />
+          <p className="text-xs text-muted-foreground">
+            Elegí un cliente guardado (todos aparecen en la lista) o completá los campos manualmente.
+          </p>
         </div>
       )}
 
