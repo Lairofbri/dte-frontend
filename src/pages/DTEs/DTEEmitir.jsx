@@ -84,10 +84,35 @@ const schemaCCF = schemaBase.extend({
 
 const schemaFSE = schemaBase.extend({
   rec_nombre:   z.string().min(1, 'Nombre requerido.'),
-  rec_nit:      z.string().regex(/^\d{4}-\d{6}-\d{3}-\d$/, 'Formato: 0000-000000-000-0'),
+  // Sujeto excluido: DUI (13) o NIT (36) — la persona no es empresa.
+  rec_tipo_doc: z.string().optional(),
+  rec_num_doc:  z.string().optional().or(z.literal('')),
+  rec_nit:      z.string().optional().or(z.literal('')),
   rec_correo:   z.string().email('Email inválido.').optional().or(z.literal('')),
   rec_telefono: z.string().optional().or(z.literal('')),
   observaciones: z.string().max(3000, 'Máximo 3000 caracteres.').optional().or(z.literal('')),
+}).superRefine((d, ctx) => {
+  const tipo = d.rec_tipo_doc || '13';
+  const num  = d.rec_num_doc?.trim();
+  const nit  = d.rec_nit?.trim();
+  const addError = (path, message) =>
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
+
+  if (!num && !nit) {
+    addError(['rec_num_doc'], 'Ingresá el DUI (o NIT) del sujeto excluido.');
+    return;
+  }
+  if (num) {
+    if (tipo === '36' && !/^\d{4}-\d{6}-\d{3}-\d$/.test(num)) {
+      addError(['rec_num_doc'], 'Formato de NIT: 0000-000000-000-0');
+    } else if (tipo === '13' && !/^\d{8}-\d$/.test(num)) {
+      addError(['rec_num_doc'], 'Formato de DUI: 00000000-0');
+    } else if (tipo !== '36' && tipo !== '13' && (num.length < 3 || num.length > 20)) {
+      addError(['rec_num_doc'], 'El documento debe tener entre 3 y 20 caracteres.');
+    }
+  } else if (nit && !/^\d{4}-\d{6}-\d{3}-\d$/.test(nit)) {
+    addError(['rec_nit'], 'Formato de NIT: 0000-000000-000-0');
+  }
 });
 
 // NC/ND: mismo receptor que CCF + documento_relacionado requerido
@@ -191,11 +216,16 @@ const DTEEmitir = () => {
       if (tipoDte === '01') {
         campos.push('rec_nombre', 'rec_tipo_doc', 'rec_num_doc', 'rec_correo', 'rec_telefono');
       } else {
-        campos.push('rec_nombre', 'rec_nit', 'rec_correo', 'rec_telefono');
+        campos.push('rec_nombre', 'rec_correo', 'rec_telefono');
+        if (tipoDte === '14') {
+          // Sujeto excluido: DUI o NIT
+          campos.push('rec_tipo_doc', 'rec_num_doc', 'rec_nit', 'observaciones');
+        } else {
+          campos.push('rec_nit');
+        }
         if (esCCF || esNCND) {
           campos.push('rec_nrc', 'rec_cod_actividad', 'rec_desc_actividad', 'rec_depto', 'rec_municipio', 'rec_distrito');
         }
-        if (tipoDte === '14') campos.push('observaciones');
       }
       if (esNCND) campos.push('doc_rel_codgen', 'doc_rel_tipo', 'doc_rel_fecha', 'fusion', 'observaciones');
       return campos;
@@ -238,6 +268,8 @@ const DTEEmitir = () => {
       if (receptorCliente.telefono)       setValue('rec_telefono', receptorCliente.telefono);
     } else {
       if (receptorCliente.nombre)          setValue('rec_nombre', receptorCliente.nombre);
+      if (receptorCliente.tipo_documento)  setValue('rec_tipo_doc', receptorCliente.tipo_documento);
+      if (receptorCliente.num_documento)   setValue('rec_num_doc', receptorCliente.num_documento);
       if (receptorCliente.nit)             setValue('rec_nit', receptorCliente.nit);
       if (receptorCliente.nrc)             setValue('rec_nrc', receptorCliente.nrc);
       if (receptorCliente.cod_actividad)   setValue('rec_cod_actividad', receptorCliente.cod_actividad);
@@ -288,10 +320,12 @@ const DTEEmitir = () => {
         };
       } else if (tipoDte === '14') {
         receptor = {
-          nit:      datos.rec_nit,
-          nombre:   datos.rec_nombre,
-          correo:   datos.rec_correo   || null,
-          telefono: datos.rec_telefono || null,
+          tipo_documento: datos.rec_tipo_doc || '13',
+          num_documento:  datos.rec_num_doc  || null,
+          nit:            datos.rec_nit      || null,
+          nombre:         datos.rec_nombre,
+          correo:         datos.rec_correo   || null,
+          telefono:       datos.rec_telefono || null,
         };
       }
 

@@ -40,9 +40,13 @@ const Paso5Resumen = ({
 
   // Recorridos "en vivo" para el resumen (mismos valores que se emitirán)
   const receptor = useWatch({ control, name: [
-    'rec_nombre', 'rec_nit', 'rec_nrc', 'rec_correo',
+    'rec_nombre', 'rec_nit', 'rec_num_doc', 'rec_tipo_doc', 'rec_nrc', 'rec_correo',
   ] }) ?? [];
-  const [recNombre, recNit, recNrc, recCorreo] = receptor;
+  const [recNombre, recNit, recNumDoc, recTipoDoc, recNrc, recCorreo] = receptor;
+
+  const etiquetaDocumento = recTipoDoc === '36'
+    ? 'NIT'
+    : recTipoDoc === '13' ? 'DUI' : 'Documento';
 
   const docRel = useWatch({ control, name: ['doc_rel_codgen', 'doc_rel_tipo', 'doc_rel_fecha'] }) ?? [];
   const [docCodgen, docTipo, docFecha] = docRel;
@@ -79,8 +83,9 @@ const Paso5Resumen = ({
           ) : (
             <>
               <FilaRecap label="Nombre / razón social" valor={recNombre} />
-              {recNit && <FilaRecap label="NIT" valor={recNit} mono />}
-              {!recNit && recNrc && <FilaRecap label="NRC" valor={recNrc} mono />}
+              {recNumDoc && <FilaRecap label={etiquetaDocumento} valor={recNumDoc} mono />}
+              {!recNumDoc && recNit && <FilaRecap label="NIT" valor={recNit} mono />}
+              {!recNumDoc && !recNit && recNrc && <FilaRecap label="NRC" valor={recNrc} mono />}
               {recCorreo && <FilaRecap label="Correo" valor={recCorreo} />}
             </>
           )}

@@ -31,8 +31,11 @@ const Paso2Receptor = ({
   fcfConDatos, onSetFcfConDatos,
   totalesPagar,
 }) => {
-  const requiereNit = esCCF || esFSE || esNCND;
-  const requiereNombre = requiereNit;
+  // FSE: el sujeto excluido no es empresa → se identifica con un documento de
+  // identidad del catálogo CAT-022 (DUI, NIT, pasaporte, carnet…). El resto de
+  // receptores fiscales (CCF/NC/ND) se identifican con NIT.
+  const requiereNitFiscal = esCCF || esNCND;
+  const requiereNombre    = esCCF || esFSE || esNCND;
 
   // Catálogos territoriales del departamento del receptor (CAT-013/CAT-008)
   const deptoReceptor = useWatch({ control, name: 'rec_depto' });
@@ -124,7 +127,7 @@ const Paso2Receptor = ({
       {!(tipoDte === '01' && !fcfConDatos) && <Separator />}
 
       {/* ── Campos manuales ── */}
-      {(fcfConDatos || requiereNit) && (
+      {(fcfConDatos || requiereNombre) && (
         <div className="space-y-4">
           <p className="text-sm font-medium text-foreground">Datos del receptor</p>
 
@@ -176,9 +179,52 @@ const Paso2Receptor = ({
               </>
             )}
 
-            {/* NIT — CCF / FSE / NC / ND */}
-            {requiereNit && (
-              <FormField label="NIT" req error={errors.rec_nit?.message} htmlFor="rec-nit">
+            {/* FSE: sujeto excluido → documento de identidad CAT-022 (DUI/NIT/…) */}
+            {esFSE && (
+              <>
+                <FormField label="Tipo de documento" req htmlFor="rec-tipo-doc-fse">
+                  <Controller
+                    name="rec_tipo_doc"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value || '13'} onValueChange={field.onChange}>
+                        <SelectTrigger id="rec-tipo-doc-fse"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                        <SelectContent>
+                          {tiposDoc.map((d) => (
+                            <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </FormField>
+                <FormField
+                  label="Número de documento"
+                  req
+                  error={errors.rec_num_doc?.message}
+                  note="DUI 00000000-0 · NIT 0000-000000-000-0 · pasaporte/carnet libre"
+                  htmlFor="rec-num-doc-fse"
+                >
+                  <Input
+                    id="rec-num-doc-fse"
+                    className={cn('font-mono', errors.rec_num_doc && 'border-destructive')}
+                    placeholder="00000000-0"
+                    aria-invalid={!!errors.rec_num_doc}
+                    {...register('rec_num_doc')}
+                  />
+                </FormField>
+              </>
+            )}
+
+            {/* NIT — CCF / NC / ND (obligatorio) · FSE (opcional) */}
+            {(requiereNitFiscal || esFSE) && (
+              <FormField
+                label="NIT"
+                req={requiereNitFiscal}
+                error={errors.rec_nit?.message}
+                note={esFSE ? 'Opcional si el sujeto excluido se identifica con DUI' : undefined}
+                htmlFor="rec-nit"
+              >
                 <Input
                   id="rec-nit"
                   className={cn('font-mono', errors.rec_nit && 'border-destructive')}

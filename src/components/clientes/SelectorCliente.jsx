@@ -1,36 +1,49 @@
 // src/components/clientes/SelectorCliente.jsx
-// Autocomplete de clientes para DTEEmitir
-// Debounce 350ms + race condition guard
-// Al seleccionar → llena todos los campos del receptor
+// Combobox async de clientes para el emisor de DTE.
+//
+// - Debounce 350 ms + guard de carrera (patrón del proyecto, sin React Query).
+// - Muestra «Nombre — DUI/NIT»: dos clientes pueden compartir nombre, pero
+//   nunca el documento; el documento evita elegir al homónimo equivocado.
+// - Al seleccionar, construye el receptor completo según el tipo de DTE
+//   (receptorDeCliente) para que el formulario se llene con TODOS los datos
+//   guardados del cliente.
 
-import { useState, useEffect, useRef, useId, useCallback } from 'react';
-import { Search, X, Plus, User, Building2, Loader2 } from 'lucide-react';
-import { buscarClientesApi } from '../../api/clientes.api';
-import ModalCliente from './ModalCliente';
-import { crearClienteApi } from '../../api/clientes.api';
+import { useState, useEffect, useRef, useId, useCallback, useMemo } from 'react';
+import { Search, X, Loader2, UserPlus } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-// Tipo de cliente sugerido según tipoDte activo
-const getTipoSugerido = (tipoDte) => {
-  if (tipoDte === '03') return 'juridico'; // CCF → jurídico
-  if (tipoDte === '14') return 'juridico'; // FSE → jurídico
-  if (tipoDte === '05' || tipoDte === '06') return 'juridico'; // NC/ND → jurídico
-  return '';                               // FCF → cualquiera
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/shadcn/input';
+import { Button } from '@/components/shadcn/button';
+import { buscarClientesApi, crearClienteApi } from '../../api/clientes.api';
+import ModalCliente from './ModalCliente';
+import {
+  etiquetaCliente, etiquetaDocumento, getTipoCliente, receptorDeCliente,
+  preferenciaParaDte, filtroSugeridoDte, tipoClienteSugeridoDte,
+} from './tiposCliente';
+
+const PLACEHOLDER_POR_DTE = {
+  '03': 'Buscar empresa (nombre, NIT, NRC)…',
+  '05': 'Buscar empresa (nombre, NIT, NRC)…',
+  '06': 'Buscar empresa (nombre, NIT, NRC)…',
+  '14': 'Buscar sujeto excluido (nombre, DUI, NIT)…',
 };
+const PLACEHOLDER_DEFAULT = 'Buscar cliente (nombre, DUI, NIT)…';
 
 const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
-  const inputId    = useId();
-  const listboxId  = useId();
-  const [busqueda,      setBusqueda]      = useState(valorActual);
-  const [resultados,    setResultados]    = useState([]);
-  const [isLoading,     setIsLoading]     = useState(false);
-  const [abierto,       setAbierto]       = useState(false);
-  const [clienteSelec,  setClienteSelec]  = useState(null);
-  const [modalNuevo,    setModalNuevo]    = useState(false);
-  const [activoIdx,     setActivoIdx]     = useState(-1);
+  const inputId   = useId();
+  const listboxId = useId();
+
+  const [busqueda,     setBusqueda]     = useState(valorActual);
+  const [resultados,   setResultados]   = useState([]);
+  const [isLoading,    setIsLoading]    = useState(false);
+  const [abierto,      setAbierto]      = useState(false);
+  const [clienteSelec, setClienteSelec] = useState(null);
+  const [modalNuevo,   setModalNuevo]   = useState(false);
+  const [activoIdx,    setActivoIdx]    = useState(-1);
   const wrapperRef = useRef(null);
 
-  // Cerrar al click fuera
+  // Cerrar al hacer click fuera
   useEffect(() => {
     const handler = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
@@ -41,10 +54,16 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const resultadosVisibles = !busqueda.trim() ? [] : resultados;
-  const abiertoVisible     = abierto && busqueda.trim().length > 0;
+  const resultadosOrdenados = useMemo(
+    () => [...resultados].sort(
+      (a, b) => preferenciaParaDte(a, tipoDte) - preferenciaParaDte(b, tipoDte)
+    ),
+    [resultados, tipoDte]
+  );
+  const resultadosVisibles = busqueda.trim() ? resultadosOrdenados : [];
+  const abiertoVisible     = abierto && !clienteSelec && busqueda.trim().length > 0;
 
-  // Búsqueda con debounce + race condition guard
+  // Búsqueda con debounce + guard de carrera
   useEffect(() => {
     if (clienteSelec) return; // Ya seleccionado — no buscar
     if (!busqueda.trim()) return;
@@ -55,8 +74,8 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
       setIsLoading(true);
       try {
         const params = { q: busqueda.trim(), limite: 8 };
-        const tipo = getTipoSugerido(tipoDte);
-        if (tipo) params.tipo_cliente = tipo;
+        const filtro = filtroSugeridoDte(tipoDte);
+        if (filtro) params.tipo_cliente = filtro;
         const datos = await buscarClientesApi(params);
         if (!cancelado) {
           setResultados(datos?.clientes ?? []);
@@ -75,43 +94,11 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
 
   const seleccionar = useCallback((cliente) => {
     setClienteSelec(cliente);
-    setBusqueda(cliente.nombre);
+    setBusqueda('');
+    setResultados([]);
     setAbierto(false);
     setActivoIdx(-1);
-    // Construir receptor según tipo de DTE
-    let receptor = null;
-    if (tipoDte === '01') {
-      receptor = {
-        nombre:        cliente.nombre,
-        tipo_documento: cliente.tipo_documento || null,
-        num_documento:  cliente.num_documento  || null,
-        correo:        cliente.correo          || null,
-        telefono:      cliente.telefono        || null,
-      };
-    } else if (tipoDte === '03' || tipoDte === '05' || tipoDte === '06') {
-      // CCF + NC + ND — mismo receptor
-      receptor = {
-        nit:            cliente.nit,
-        nrc:            cliente.nrc            || null,
-        nombre:         cliente.nombre,
-        cod_actividad:  cliente.cod_actividad  || null,
-        desc_actividad: cliente.desc_actividad || null,
-        correo:         cliente.correo         || null,
-        telefono:       cliente.telefono       || null,
-        departamento_cod: cliente.departamento_cod || null,
-        municipio_cod:  cliente.municipio_cod  || null,
-        distrito_cod:   cliente.distrito_cod   || null,
-        direccion:      cliente.direccion      || null,
-      };
-    } else if (tipoDte === '14') {
-      receptor = {
-        nit:      cliente.nit,
-        nombre:   cliente.nombre,
-        correo:   cliente.correo   || null,
-        telefono: cliente.telefono || null,
-      };
-    }
-    onSeleccionar(receptor, cliente.id);
+    onSeleccionar(receptorDeCliente(cliente, tipoDte), cliente.id);
   }, [tipoDte, onSeleccionar]);
 
   const limpiar = () => {
@@ -119,18 +106,22 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
     setBusqueda('');
     setResultados([]);
     setAbierto(false);
+    setActivoIdx(-1);
     onSeleccionar(null, null);
   };
 
   // Navegación con teclado
   const onKeyDown = (e) => {
-    if (!abiertoVisible || resultadosVisibles.length === 0) return;
+    if (!abiertoVisible || resultadosVisibles.length === 0) {
+      if (e.key === 'Escape') setAbierto(false);
+      return;
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActivoIdx(p => Math.min(p + 1, resultadosVisibles.length - 1));
+      setActivoIdx((p) => Math.min(p + 1, resultadosVisibles.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setActivoIdx(p => Math.max(p - 1, 0));
+      setActivoIdx((p) => Math.max(p - 1, 0));
     } else if (e.key === 'Enter' && activoIdx >= 0) {
       e.preventDefault();
       seleccionar(resultadosVisibles[activoIdx]);
@@ -139,7 +130,7 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
     }
   };
 
-  // Crear cliente desde el selector
+  // Crear cliente desde el selector (semilla con lo escrito + tipo sugerido)
   const onCrearCliente = async (datos) => {
     const nuevo = await crearClienteApi(datos);
     toast.success('Cliente creado y seleccionado.');
@@ -147,13 +138,17 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
     setModalNuevo(false);
   };
 
+  const semilla = useMemo(
+    () => ({ nombre: busqueda.trim(), tipo_cliente: tipoClienteSugeridoDte(tipoDte) }),
+    [busqueda, tipoDte]
+  );
+
   return (
-    <div ref={wrapperRef} className="relative">
-      {/* Input */}
+    <div ref={wrapperRef} className="relative space-y-2">
+      {/* Input de búsqueda */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
-          aria-hidden="true" />
-        <input
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <Input
           id={inputId}
           type="text"
           role="combobox"
@@ -166,49 +161,30 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
             setBusqueda(e.target.value);
             if (clienteSelec) setClienteSelec(null);
           }}
-          onFocus={() => { if (resultadosVisibles.length > 0) setAbierto(true); }}
+          onFocus={() => { if (!clienteSelec && resultadosVisibles.length > 0) setAbierto(true); }}
           onKeyDown={onKeyDown}
-          placeholder={
-            tipoDte === '03' ? 'Buscar empresa (NIT, NRC, nombre)...' :
-            tipoDte === '14' ? 'Buscar sujeto excluido (NIT, nombre)...' :
-            (tipoDte === '05' || tipoDte === '06') ? 'Buscar empresa (NIT, NRC, nombre)...' :
-            'Buscar cliente (nombre, DUI, NIT)...'
-          }
-          className={`input pl-9 pr-16 ${clienteSelec ? 'bg-green-50 border-green-300' : ''}`}
+          placeholder={PLACEHOLDER_POR_DTE[tipoDte] || PLACEHOLDER_DEFAULT}
+          className="h-10 pl-9 pr-16"
           autoComplete="off"
         />
 
-        {/* Indicadores derecha */}
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-          {isLoading && (
-            <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" aria-hidden="true" />
-          )}
+        <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
+          {isLoading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden="true" />}
           {clienteSelec && (
-            <button type="button" onClick={limpiar}
+            <button
+              type="button"
+              onClick={limpiar}
               aria-label="Quitar cliente seleccionado"
-              className="text-gray-400 hover:text-gray-600 transition-colors">
-              <X className="w-4 h-4" aria-hidden="true" />
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <X className="size-4" aria-hidden="true" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Chip del seleccionado */}
-      {clienteSelec && (
-        <div className="mt-1.5 flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg">
-          {clienteSelec.tipo_cliente === 'juridico'
-            ? <Building2 className="w-3.5 h-3.5 text-green-600 shrink-0" aria-hidden="true" />
-            : <User      className="w-3.5 h-3.5 text-green-600 shrink-0" aria-hidden="true" />
-          }
-          <span className="text-xs text-green-700 font-medium">{clienteSelec.nombre}</span>
-          {clienteSelec.nit && (
-            <span className="text-xs text-green-500 font-mono">NIT: {clienteSelec.nit}</span>
-          )}
-          {clienteSelec.num_documento && (
-            <span className="text-xs text-green-500 font-mono">{clienteSelec.num_documento}</span>
-          )}
-        </div>
-      )}
+      {/* Chip del cliente seleccionado */}
+      {clienteSelec && <ChipSeleccionado cliente={clienteSelec} onLimpiar={limpiar} />}
 
       {/* Dropdown */}
       {abiertoVisible && (
@@ -216,73 +192,126 @@ const SelectorCliente = ({ tipoDte, onSeleccionar, valorActual = '' }) => {
           id={listboxId}
           role="listbox"
           aria-label="Resultados de búsqueda de clientes"
-          className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-
+          className="absolute z-50 mt-1 w-full origin-top overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl duration-150 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2"
+        >
           {resultadosVisibles.length === 0 ? (
-            <li className="px-4 py-3 text-sm text-gray-400 text-center">
-              Sin resultados — ¿deseas crear este cliente?
+            <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+              Sin resultados — ¿querés crear este cliente?
             </li>
           ) : (
-            resultadosVisibles.map((cliente, idx) => (
-              <li
-                key={cliente.id}
-                id={`${listboxId}-${idx}`}
-                role="option"
-                aria-selected={activoIdx === idx}
-                onClick={() => seleccionar(cliente)}
-                onMouseEnter={() => setActivoIdx(idx)}
-                className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-gray-50 last:border-0 ${
-                  activoIdx === idx ? 'bg-primary-50' : 'hover:bg-gray-50'
-                }`}>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
-                  cliente.tipo_cliente === 'juridico'
-                    ? 'bg-blue-100 text-blue-600'
-                    : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {cliente.tipo_cliente === 'juridico'
-                    ? <Building2 className="w-3.5 h-3.5" aria-hidden="true" />
-                    : <User      className="w-3.5 h-3.5" aria-hidden="true" />
-                  }
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">{cliente.nombre}</p>
-                  <p className="text-xs text-gray-400 truncate">
-                    {cliente.tipo_cliente === 'juridico'
-                      ? [cliente.nit && `NIT: ${cliente.nit}`, cliente.nrc && `NRC: ${cliente.nrc}`].filter(Boolean).join(' · ')
-                      : [
-                          cliente.tipo_documento && cliente.num_documento && `${cliente.tipo_documento === '13' ? 'DUI' : cliente.tipo_documento}: ${cliente.num_documento}`,
-                          cliente.correo,
-                        ].filter(Boolean).join(' · ')
-                    }
-                  </p>
-                </div>
-                {cliente.total_dtes > 0 && (
-                  <span className="text-xs text-gray-300 shrink-0">{cliente.total_dtes} DTE</span>
-                )}
-              </li>
-            ))
+            <li className="max-h-80 overflow-y-auto py-1">
+              <ul>
+                {resultadosVisibles.map((cliente, idx) => (
+                  <FilaResultado
+                    key={cliente.id}
+                    id={`${listboxId}-${idx}`}
+                    cliente={cliente}
+                    activo={activoIdx === idx}
+                    onSeleccionar={() => seleccionar(cliente)}
+                    onActivar={() => setActivoIdx(idx)}
+                  />
+                ))}
+              </ul>
+            </li>
           )}
 
-          {/* Opción crear nuevo */}
-          <li
-            role="option"
-            onClick={() => { setAbierto(false); setModalNuevo(true); }}
-            className="flex items-center gap-2 px-4 py-3 cursor-pointer text-primary-600 hover:bg-primary-50 border-t border-gray-100 transition-colors">
-            <Plus className="w-4 h-4 shrink-0" aria-hidden="true" />
-            <span className="text-sm font-medium">
-              Crear nuevo cliente
-              {busqueda.trim() && ` "${busqueda.trim()}"`}
-            </span>
+          {/* Alta rápida */}
+          <li className="border-t border-border">
+            <button
+              type="button"
+              onClick={() => { setAbierto(false); setModalNuevo(true); }}
+              className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-primary transition-colors hover:bg-accent"
+            >
+              <UserPlus className="size-4 shrink-0" aria-hidden="true" />
+              <span>
+                Crear nuevo cliente
+                {busqueda.trim() && <span className="text-muted-foreground"> «{busqueda.trim()}»</span>}
+              </span>
+            </button>
           </li>
         </ul>
       )}
 
-      {/* Modal crear cliente desde el selector */}
+      {/* Modal de alta (crear) */}
       <ModalCliente
         isOpen={modalNuevo}
         onClose={() => setModalNuevo(false)}
         onGuardar={onCrearCliente}
+        semilla={semilla}
       />
+    </div>
+  );
+};
+
+// ── Fila de resultado ──
+const FilaResultado = ({ id, cliente, activo, onSeleccionar, onActivar }) => {
+  const meta = getTipoCliente(cliente.tipo_cliente);
+  const Icono = meta.icono;
+  const documento = etiquetaDocumento(cliente);
+
+  return (
+    <li
+      id={id}
+      role="option"
+      aria-selected={activo}
+      onClick={onSeleccionar}
+      onMouseEnter={onActivar}
+      className={cn(
+        'flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors',
+        activo ? 'bg-accent' : 'hover:bg-accent/60'
+      )}
+    >
+      <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ring-1', meta.acento)}>
+        <Icono className="size-4" aria-hidden="true" />
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium text-foreground">
+          {cliente.nombre}
+        </span>
+        <span className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+          {documento && <span className="font-mono">{documento}</span>}
+          {documento && cliente.correo && <span aria-hidden="true">·</span>}
+          {cliente.correo && <span className="truncate">{cliente.correo}</span>}
+          {!documento && !cliente.correo && <span className="italic">Sin más datos</span>}
+        </span>
+      </span>
+
+      {cliente.total_dtes > 0 && (
+        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+          {cliente.total_dtes} DTE{cliente.total_dtes !== 1 ? 's' : ''}
+        </span>
+      )}
+    </li>
+  );
+};
+
+// ── Chip del cliente seleccionado ──
+const ChipSeleccionado = ({ cliente, onLimpiar }) => {
+  const meta = getTipoCliente(cliente.tipo_cliente);
+  const Icono = meta.icono;
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2">
+      <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ring-1', meta.acento)}>
+        <Icono className="size-4" aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">
+          {etiquetaCliente(cliente)}
+        </p>
+        <p className="truncate text-xs text-muted-foreground">{meta.etiqueta}</p>
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={onLimpiar}
+        aria-label="Quitar cliente seleccionado"
+        className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+      >
+        <X className="size-4" aria-hidden="true" />
+      </Button>
     </div>
   );
 };

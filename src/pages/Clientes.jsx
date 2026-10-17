@@ -3,12 +3,13 @@
 
 import { useState, useEffect, useCallback, useId } from 'react';
 import { toast }        from 'react-hot-toast';
-import { Users, Plus, Pencil, Trash2, RefreshCw, Building2, User } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, RefreshCw, Building2, User, ShieldCheck } from 'lucide-react';
 import {
   buscarClientesApi, crearClienteApi,
   actualizarClienteApi, eliminarClienteApi,
 } from '../api/clientes.api';
 import ModalCliente from '../components/clientes/ModalCliente';
+import { etiquetaDocumento } from '../components/clientes/tiposCliente';
 import Spinner      from '../components/ui/Spinner';
 import Button       from '../components/ui/Button';
 
@@ -58,14 +59,43 @@ const useClientes = () => {
 // ─────────────────────────────────────────────
 // BADGE TIPO CLIENTE
 // ─────────────────────────────────────────────
-const BadgeTipo = ({ tipo }) => (
-  tipo === 'juridico'
-    ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-700 border border-blue-100">
-        <Building2 className="w-3 h-3" aria-hidden="true" /> Jurídico
-      </span>
-    : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-50 text-gray-600 border border-gray-200">
-        <User className="w-3 h-3" aria-hidden="true" /> Natural
-      </span>
+const ESTILO_TIPO = {
+  juridico: {
+    clase: 'bg-blue-50 text-blue-700 border-blue-100',
+    Icono: Building2,
+    label: 'Jurídico',
+  },
+  sujeto_excluido: {
+    clase: 'bg-amber-50 text-amber-700 border-amber-100',
+    Icono: ShieldCheck,
+    label: 'Sujeto excluido',
+  },
+  natural: {
+    clase: 'bg-gray-50 text-gray-600 border-gray-200',
+    Icono: User,
+    label: 'Natural',
+  },
+};
+
+const BadgeTipo = ({ tipo }) => {
+  const { clase, Icono, label } = ESTILO_TIPO[tipo] || ESTILO_TIPO.natural;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${clase}`}>
+      <Icono className="w-3 h-3" aria-hidden="true" /> {label}
+    </span>
+  );
+};
+
+// Detalle del cliente (documento principal + contacto)
+const DetalleCliente = ({ cliente }) => (
+  <p className="text-xs text-gray-400 mt-0.5 truncate">
+    {[
+      cliente.nombre_comercial,
+      etiquetaDocumento(cliente),
+      cliente.nrc && `NRC: ${cliente.nrc}`,
+      cliente.correo,
+    ].filter(Boolean).join(' · ')}
+  </p>
 );
 
 // ─────────────────────────────────────────────
@@ -157,6 +187,7 @@ const Clientes = () => {
                 <option value="">Todos los tipos</option>
                 <option value="natural">Persona natural</option>
                 <option value="juridico">Persona jurídica</option>
+                <option value="sujeto_excluido">Sujeto excluido</option>
               </select>
             </div>
             <Button variant="secondary" onClick={recargar}
@@ -204,11 +235,15 @@ const Clientes = () => {
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
                   cliente.tipo_cliente === 'juridico'
                     ? 'bg-blue-50 text-blue-600'
-                    : 'bg-gray-100 text-gray-500'
+                    : cliente.tipo_cliente === 'sujeto_excluido'
+                      ? 'bg-amber-50 text-amber-600'
+                      : 'bg-gray-100 text-gray-500'
                 }`}>
                   {cliente.tipo_cliente === 'juridico'
-                    ? <Building2 className="w-4 h-4" aria-hidden="true" />
-                    : <User      className="w-4 h-4" aria-hidden="true" />
+                    ? <Building2   className="w-4 h-4" aria-hidden="true" />
+                    : cliente.tipo_cliente === 'sujeto_excluido'
+                      ? <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                      : <User        className="w-4 h-4" aria-hidden="true" />
                   }
                 </div>
 
@@ -220,20 +255,7 @@ const Clientes = () => {
                     </p>
                     <BadgeTipo tipo={cliente.tipo_cliente} />
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5 truncate">
-                    {cliente.tipo_cliente === 'juridico'
-                      ? [
-                          cliente.nit  && `NIT: ${cliente.nit}`,
-                          cliente.nrc  && `NRC: ${cliente.nrc}`,
-                          cliente.cod_actividad && cliente.cod_actividad,
-                        ].filter(Boolean).join(' · ')
-                      : [
-                          cliente.tipo_documento && cliente.num_documento
-                            && `${cliente.tipo_documento === '13' ? 'DUI' : cliente.tipo_documento}: ${cliente.num_documento}`,
-                          cliente.correo,
-                        ].filter(Boolean).join(' · ')
-                    }
-                  </p>
+                  <DetalleCliente cliente={cliente} />
                 </div>
 
                 {/* DTEs */}

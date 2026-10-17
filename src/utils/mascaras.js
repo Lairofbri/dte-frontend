@@ -19,6 +19,13 @@ const aplicarMascaraNRC = (valor) => {
   return `${d.slice(0, 6)}-${d.slice(6)}`;
 };
 
+// DUI: 8 dígitos + guion + 1 dígito verificador → 00000000-0
+const aplicarMascaraDUI = (valor) => {
+  const d = soloDigitos(valor).slice(0, 9);
+  if (d.length <= 8) return d;
+  return `${d.slice(0, 8)}-${d.slice(8)}`;
+};
+
 const aplicarMascaraTelefono = (valor) => {
   let d = soloDigitos(valor);
   if (d.startsWith('503') && d.length > 8) d = d.slice(3);
@@ -29,11 +36,12 @@ const aplicarMascaraTelefono = (valor) => {
 
 /**
  * Aplica la máscara según el tipo de campo.
- * @param {'nit'|'nrc'|'telefono'} tipo
+ * @param {'nit'|'nrc'|'dui'|'telefono'} tipo
  */
 const aplicarMascara = (tipo, valor) => {
   if (tipo === 'nit') return aplicarMascaraNIT(valor);
   if (tipo === 'nrc') return aplicarMascaraNRC(valor);
+  if (tipo === 'dui') return aplicarMascaraDUI(valor);
   if (tipo === 'telefono') return aplicarMascaraTelefono(valor);
   return valor;
 };
@@ -44,4 +52,4 @@ const aplicarMascara = (tipo, valor) => {
  */
 const limpiarFormato = (valor) => (valor || '').replace(/[-\s]/g, '');
 
-export { aplicarMascara, limpiarFormato, soloDigitos };
+export { aplicarMascara, limpiarFormato, soloDigitos, aplicarMascaraDUI };
