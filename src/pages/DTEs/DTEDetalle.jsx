@@ -183,6 +183,9 @@ const DTEDetalle = () => {
   // La arma el backend (fechaEmi en YYYY-MM-DD, formato oficial del MH).
   const urlConsultaHacienda = dte.qr_url ?? null;
 
+  // El FCF (01) declara la gravada con IVA incluido; CCF/NC/ND, sin IVA.
+  const esFcf = dte.tipo_dte === '01';
+
   const puedeAnular = dte.estado === 'aceptado';
 
   return (
@@ -333,8 +336,23 @@ const DTEDetalle = () => {
         <div className="card-header">
           <h2 className="font-semibold text-gray-800 font-sans">Montos</h2>
         </div>
+        {/* El FCF (01) declara la gravada CON el IVA incluido (esquema oficial:
+            así vienen los FCF reales aceptados por Hacienda), por eso se rotula
+            y se muestra la base y el IVA contenido. En CCF/NC/ND la gravada ya
+            es la base sin IVA (ahí no hay filas extra). */}
         <div className="card-body grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <InfoField label="Total gravado" valor={formatMonto(dte.total_gravado)} mono />
+          <InfoField
+            label={esFcf ? 'Total gravado (IVA incluido)' : 'Total gravado'}
+            valor={formatMonto(dte.total_gravado)}
+            mono
+          />
+          {esFcf && (
+            <InfoField
+              label="Base sin IVA"
+              valor={formatMonto(Math.round(((dte.total_gravado ?? 0) - (dte.total_iva ?? 0)) * 100) / 100)}
+              mono
+            />
+          )}
           <InfoField label="IVA (13%)"     valor={formatMonto(dte.total_iva)}     mono />
           <InfoField label="Total"         valor={formatMonto(dte.total)}         mono />
         </div>
