@@ -10,7 +10,7 @@ import {
   Settings, Building2, Users, ClipboardList, UserSquare2,
   Rocket, ChevronLeft, ChevronRight, ChevronDown, Package,
 } from 'lucide-react';
-import { useAuthStore, selectEsAdmin, selectEsPlataforma, selectUsuario, selectEstablecimientoSeleccionado } from '../../store/auth.store';
+import { useAuthStore, selectEsAdmin, selectEsPlataforma, selectUsuario, selectEstablecimientoSeleccionado, obtenerRoles } from '../../store/auth.store';
 
 // ── Datos estáticos de menú ──
 const menuPrincipal = [
@@ -298,7 +298,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
           {!esColapsado ? (
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">{usuario?.nombre}</p>
-              <p className="text-sidebar-text text-xs capitalize">{usuario?.rol}</p>
+              <p className="text-sidebar-text text-xs capitalize">{obtenerRoles(usuario).join(' · ')}</p>
             </div>
           ) : null}
 

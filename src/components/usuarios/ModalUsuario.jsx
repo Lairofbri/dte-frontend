@@ -2,6 +2,7 @@
 // Fix CUBIC: resolver fijo — no condicional por modoEdicion
 // El password es opcional en ambos modos — la validación de requerido
 // se hace con refine según si es edición o no
+// Multi-rol (2026-10-16): el usuario puede tener VARIOS roles (checkboxes).
 
 import { useEffect, useId, useState } from 'react';
 import { useForm }     from 'react-hook-form';
@@ -10,6 +11,14 @@ import { z }           from 'zod';
 import { Eye, EyeOff } from 'lucide-react';
 import Modal  from '../ui/Modal';
 import Button from '../ui/Button';
+import { obtenerRoles } from '../../store/auth.store';
+
+// Roles disponibles (mismos que el backend — migración 035).
+const ROLES_DISPONIBLES = [
+  { value: 'operador',      label: 'Operador',      desc: 'Emite y ve DTEs de su establecimiento.' },
+  { value: 'administrador', label: 'Administrador', desc: 'Gestiona usuarios, establecimientos y configuración.' },
+  { value: 'plataforma',    label: 'Plataforma',    desc: 'Alta de empresas (onboarding).' },
+];
 
 // Schema único — password opcional en edición, requerido en creación
 // Se controla con el campo oculto modoEdicion
@@ -17,7 +26,8 @@ const schema = z.object({
   nombre:             z.string().min(3, 'Mínimo 3 caracteres.'),
   email:              z.string().email('Email inválido.'),
   password:           z.string().optional().or(z.literal('')),
-  rol:                z.enum(['administrador', 'operador', 'plataforma']),
+  roles:              z.array(z.enum(['administrador', 'operador', 'plataforma']))
+                        .min(1, 'Selecciona al menos un rol.'),
   establecimiento_id: z.string().uuid('Selecciona un establecimiento.'),
   _esNuevo:           z.boolean(),
 }).superRefine((data, ctx) => {
@@ -63,7 +73,7 @@ const ModalUsuario = ({ isOpen, onClose, onGuardar, usuario = null, establecimie
         nombre:             usuario?.nombre             ?? '',
         email:              usuario?.email              ?? '',
         password:           '',
-        rol:                usuario?.rol               ?? 'operador',
+        roles:              modoEdicion ? obtenerRoles(usuario) : ['operador'],
         establecimiento_id: usuario?.establecimiento_id ?? '',
         _esNuevo:           !modoEdicion,
       });
@@ -137,31 +147,41 @@ const ModalUsuario = ({ isOpen, onClose, onGuardar, usuario = null, establecimie
           {!modoEdicion && <p className="text-xs text-gray-400 mt-1">Mínimo 8 caracteres, una mayúscula, un número y un carácter especial.</p>}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor={`${formId}-rol`} className="label">
-              Rol <span className="text-red-500" aria-hidden="true">*</span>
-            </label>
-            <select id={`${formId}-rol`} className="input" {...register('rol')}>
-              <option value="operador">Operador</option>
-              <option value="administrador">Administrador</option>
-              <option value="plataforma">Plataforma</option>
-            </select>
+        {/* Multi-rol: el usuario puede tener varios roles a la vez. */}
+        <fieldset>
+          <legend className="label">
+            Roles <span className="text-red-500" aria-hidden="true">*</span>
+          </legend>
+          <div className="space-y-2 mt-1">
+            {ROLES_DISPONIBLES.map((rol) => (
+              <label key={rol.value}
+                className="flex items-start gap-3 p-2.5 rounded-lg border border-gray-200 hover:border-primary-300 cursor-pointer transition-colors">
+                <input type="checkbox" value={rol.value}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  {...register('roles')} />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-gray-800">{rol.label}</span>
+                  <span className="block text-xs text-gray-400">{rol.desc}</span>
+                </span>
+              </label>
+            ))}
           </div>
-          <div>
-            <label htmlFor={`${formId}-estable`} className="label">
-              Establecimiento <span className="text-red-500" aria-hidden="true">*</span>
-            </label>
-            <select id={`${formId}-estable`}
-              className={`input ${errors.establecimiento_id ? 'input-error' : ''}`}
-              {...register('establecimiento_id')}>
-              <option value="">Seleccionar...</option>
-              {establecimientos.map((e) => (
-                <option key={e.id} value={e.id}>{e.nombre} ({e.cod_estable_mh})</option>
-              ))}
-            </select>
-            {errors.establecimiento_id && <p className="error-msg" role="alert">{errors.establecimiento_id.message}</p>}
-          </div>
+          {errors.roles && <p className="error-msg" role="alert">{errors.roles.message}</p>}
+        </fieldset>
+
+        <div>
+          <label htmlFor={`${formId}-estable`} className="label">
+            Establecimiento <span className="text-red-500" aria-hidden="true">*</span>
+          </label>
+          <select id={`${formId}-estable`}
+            className={`input ${errors.establecimiento_id ? 'input-error' : ''}`}
+            {...register('establecimiento_id')}>
+            <option value="">Seleccionar...</option>
+            {establecimientos.map((e) => (
+              <option key={e.id} value={e.id}>{e.nombre} ({e.cod_estable_mh})</option>
+            ))}
+          </select>
+          {errors.establecimiento_id && <p className="error-msg" role="alert">{errors.establecimiento_id.message}</p>}
         </div>
 
         {/* Campo oculto para el modo */}

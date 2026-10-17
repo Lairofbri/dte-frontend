@@ -5,10 +5,23 @@ import { useUsuarios }         from '../hooks/useUsuarios';
 import { useEstablecimientos } from '../hooks/useEstablecimientos';
 import ModalUsuario            from '../components/usuarios/ModalUsuario';
 import { BadgeGenerico }       from '../components/ui/Badge';
+import { obtenerRoles }        from '../store/auth.store';
 import Table                   from '../components/ui/Table';
 import Button                  from '../components/ui/Button';
 import Spinner                 from '../components/ui/Spinner';
 import Modal                   from '../components/ui/Modal';
+
+const ETIQUETA_ROL = {
+  administrador: 'Administrador',
+  plataforma:    'Plataforma',
+  operador:      'Operador',
+};
+
+const VARIANTE_ROL = {
+  administrador: 'blue',
+  plataforma:    'purple',
+  operador:      'gray',
+};
 
 const Usuarios = () => {
   const { usuarios, isLoading, error, crear, actualizar, desactivar } = useUsuarios();
@@ -54,13 +67,22 @@ const Usuarios = () => {
       ),
     },
     {
-      key:    'rol',
-      header: 'Rol',
-      render: (valor) => (
-        <BadgeGenerico variant={valor === 'administrador' ? 'blue' : 'gray'}>
-          {valor === 'administrador' ? 'Administrador' : 'Operador'}
-        </BadgeGenerico>
-      ),
+      key:    'roles',
+      header: 'Roles',
+      render: (_, fila) => {
+        const roles = obtenerRoles(fila);
+        return (
+          <div className="flex flex-wrap gap-1">
+            {roles.length === 0 ? (
+              <span className="text-sm text-gray-400">—</span>
+            ) : roles.map((rol) => (
+              <BadgeGenerico key={rol} variant={VARIANTE_ROL[rol] ?? 'gray'}>
+                {ETIQUETA_ROL[rol] ?? rol}
+              </BadgeGenerico>
+            ))}
+          </div>
+        );
+      },
     },
     {
       key:    'establecimiento_id',

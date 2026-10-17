@@ -74,11 +74,25 @@ export const useAuthStore = create((set) => ({
 // Fix CUBIC: los selectores externos SÍ disparan re-renders
 // Uso: const esAdmin = useAuthStore(selectEsAdmin);
 // ─────────────────────────────────────────────
+
+// Multi-rol (2026-10-16): un usuario puede tener varios roles. `roles` es la
+// lista; `rol` se conserva como principal (compat con sesiones previas).
+// Helper puro (no selector) para no crear referencias nuevas en cada render.
+export const obtenerRoles = (usuario) => {
+  if (!usuario) return [];
+  if (Array.isArray(usuario.roles) && usuario.roles.length > 0) return usuario.roles;
+  return usuario.rol ? [usuario.rol] : [];
+};
+
 export const selectEsAdmin =
-  (state) => state.usuario?.rol === 'administrador';
+  (state) => obtenerRoles(state.usuario).includes('administrador');
 
 export const selectEsPlataforma =
-  (state) => state.usuario?.rol === 'plataforma';
+  (state) => obtenerRoles(state.usuario).includes('plataforma');
+
+// Puede administrar el tenant: administrador o plataforma.
+export const selectPuedeAdministrar =
+  (state) => obtenerRoles(state.usuario).some((r) => r === 'administrador' || r === 'plataforma');
 
 export const selectEstablecimientoId =
   (state) => state.establecimientoId;

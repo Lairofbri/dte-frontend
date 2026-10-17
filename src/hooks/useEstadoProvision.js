@@ -9,6 +9,7 @@ import {
   crearTenantPlataformaApi,
   actualizarTenantPlataformaApi,
   actualizarAdminTenantPlataformaApi,
+  habilitarPosTenantApi,
 } from '../api/provisioning.api';
 
 export const useEstadoProvision = ({ enabled = true } = {}) => {
@@ -18,6 +19,7 @@ export const useEstadoProvision = ({ enabled = true } = {}) => {
   const [contadorRecarga,   setContadorRecarga]   = useState(0);
   const [creando,           setCreando]           = useState(false);
   const [actualizando,      setActualizando]      = useState(false);
+  const [habilitandoPos,    setHabilitandoPos]    = useState(false);
 
   useEffect(() => {
     let cancelado = false;
@@ -121,14 +123,32 @@ export const useEstadoProvision = ({ enabled = true } = {}) => {
     }
   }, [recargar]);
 
+  const habilitarPos = useCallback(async ({ tenantId, pin }) => {
+    setHabilitandoPos(true);
+    try {
+      const resultado = await habilitarPosTenantApi(tenantId, { pin });
+      toast.success(
+        resultado?.ya_habilitado
+          ? 'La empresa ya tenía POS habilitado.'
+          : 'POS habilitado correctamente.'
+      );
+      recargar();
+      return resultado;
+    } finally {
+      setHabilitandoPos(false);
+    }
+  }, [recargar]);
+
   return {
     tenants: enabled ? tenants : [],
     isLoading: enabled && isLoading,
     error: enabled ? error : null,
     creando,
     actualizando,
+    habilitandoPos,
     recargar,
     crearEmpresa,
     actualizarEmpresa,
+    habilitarPos,
   };
 };

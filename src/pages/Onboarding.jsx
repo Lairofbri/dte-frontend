@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link }              from 'react-router-dom';
-import { Plus, RefreshCw, Pencil } from 'lucide-react';
+import { Plus, RefreshCw, Pencil, PlugZap } from 'lucide-react';
 import { useEstadoProvision } from '../hooks/useEstadoProvision';
 import { useAuthStore, selectEsPlataforma } from '../store/auth.store';
 import { obtenerCatalogoApi } from '../api/catalogos.api';
@@ -57,6 +57,7 @@ const Onboarding = () => {
     tenants, isLoading, error, recargar,
     crearEmpresa, creando,
     actualizarEmpresa, actualizando,
+    habilitarPos, habilitandoPos,
   } = useEstadoProvision();
 
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -132,6 +133,44 @@ const Onboarding = () => {
   const cerrarEditar = () => {
     setTenantEditando(null);
     setErrorEdit(null);
+  };
+
+  // Habilitar POS (2026-10-16) — solo rol plataforma. Una empresa creada "solo
+  // DTE" puede adquirir POS después: se captura el PIN del usuario POS y, al
+  // confirmar, el backend genera la API Key técnica (se muestra UNA sola vez).
+  const [tenantHabilitando, setTenantHabilitando] = useState(null);
+  const [pinHabilitar, setPinHabilitar] = useState('');
+  const [errorHabilitar, setErrorHabilitar] = useState(null);
+  const [apiKeyGenerada, setApiKeyGenerada] = useState(null);
+
+  const abrirHabilitar = (fila) => {
+    setPinHabilitar('');
+    setErrorHabilitar(null);
+    setTenantHabilitando(fila);
+  };
+
+  const cerrarHabilitar = () => {
+    setTenantHabilitando(null);
+    setErrorHabilitar(null);
+    setPinHabilitar('');
+  };
+
+  const handleHabilitar = async () => {
+    if (!/^\d{6}$/.test(pinHabilitar.trim())) {
+      setErrorHabilitar('El PIN (usuario POS) debe tener exactamente 6 dígitos.');
+      return;
+    }
+    setErrorHabilitar(null);
+    try {
+      const resultado = await habilitarPos({ tenantId: tenantHabilitando.id, pin: pinHabilitar.trim() });
+      const nombre = nombreVisible(tenantHabilitando);
+      cerrarHabilitar();
+      if (resultado?.api_key) {
+        setApiKeyGenerada({ nombre, apiKey: resultado.api_key });
+      }
+    } catch (e) {
+      setErrorHabilitar(e?.response?.data?.mensaje ?? 'No se pudo habilitar POS.');
+    }
   };
 
   const handleCrear = async () => {
@@ -282,6 +321,15 @@ const Onboarding = () => {
       },
     },
     {
+      key: 'tiene_pos',
+      header: 'POS',
+      render: (valor) => (
+        <BadgeGenerico variant={valor ? 'green' : 'gray'}>
+          {valor ? 'Con POS' : 'Solo DTE'}
+        </BadgeGenerico>
+      ),
+    },
+    {
       key: 'tiene_api_key',
       header: 'API Key integración',
       // Fase 4 — separa la API Key técnica de las credenciales oficiales
@@ -320,15 +368,29 @@ const Onboarding = () => {
           key: 'acciones',
           header: 'Acciones',
           render: (_valor, fila) => (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => abrirEditar(fila)}
-              aria-label={`Editar ${nombreVisible(fila)}`}
-            >
-              <Pencil className="w-4 h-4" />
-              Editar
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => abrirEditar(fila)}
+                aria-label={`Editar ${nombreVisible(fila)}`}
+              >
+                <Pencil className="w-4 h-4" />
+                Editar
+              </Button>
+              {!fila.tiene_pos ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => abrirHabilitar(fila)}
+                  aria-label={`Habilitar POS para ${nombreVisible(fila)}`}
+                  title="Empresa creada solo con DTE: habilitar POS (usuario y API Key de integración)"
+                >
+                  <PlugZap className="w-4 h-4" />
+                  Habilitar POS
+                </Button>
+              ) : null}
+            </div>
           ),
         }]
       : []),
@@ -730,6 +792,87 @@ const Onboarding = () => {
               <Button onClick={handleEditar} disabled={actualizando}>
                 {actualizando ? 'Guardando...' : 'Guardar cambios'}
               </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+
+      {/* Habilitar POS para una empresa creada "solo DTE" (rol plataforma). */}
+      {esPlataforma && tenantHabilitando ? (
+        <Modal
+          isOpen={!!tenantHabilitando}
+          onClose={cerrarHabilitar}
+          title="Habilitar POS"
+          size="sm"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Vas a habilitar el POS para{' '}
+              <span className="font-semibold">{nombreVisible(tenantHabilitando)}</span>.
+              Se proyectarán sus sucursales y su usuario administrador al POS, y se
+              generará la API Key técnica de integración.
+            </p>
+            <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              La contraseña del administrador ya rige en ambas plataformas. El PIN es
+              exclusivo del POS (6 dígitos). La API Key se mostrará UNA sola vez.
+            </p>
+            <Input
+              label="PIN del usuario POS"
+              required
+              inputMode="numeric"
+              maxLength={6}
+              value={pinHabilitar}
+              onChange={(e) => setPinHabilitar(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="123456"
+              helperText="Exactamente 6 dígitos."
+            />
+            {errorHabilitar ? (
+              <p className="text-sm text-red-600">{errorHabilitar}</p>
+            ) : null}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="secondary" onClick={cerrarHabilitar}>
+                Cancelar
+              </Button>
+              <Button onClick={handleHabilitar} disabled={habilitandoPos}>
+                {habilitandoPos ? 'Habilitando...' : 'Habilitar POS'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+
+      {/* API Key técnica: se muestra UNA sola vez (spec §3.3). */}
+      {apiKeyGenerada ? (
+        <Modal
+          isOpen={!!apiKeyGenerada}
+          onClose={() => setApiKeyGenerada(null)}
+          title="API Key de integración POS ↔ DTE"
+          size="md"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              POS quedó habilitado para{' '}
+              <span className="font-semibold">{apiKeyGenerada.nombre}</span>. Copiá la
+              API Key ahora y cargala en el POS: <span className="font-semibold">no se
+              volverá a mostrar</span>.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={apiKeyGenerada.apiKey}
+                aria-label="API Key de integración"
+                className="input font-mono text-xs"
+                onFocus={(e) => e.target.select()}
+              />
+              <Button
+                variant="secondary"
+                onClick={() => navigator.clipboard?.writeText(apiKeyGenerada.apiKey)}
+              >
+                Copiar
+              </Button>
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setApiKeyGenerada(null)}>Entendido</Button>
             </div>
           </div>
         </Modal>

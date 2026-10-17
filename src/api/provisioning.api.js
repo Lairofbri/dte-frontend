@@ -30,3 +30,11 @@ export const actualizarAdminTenantPlataformaApi = async (tenantId, datos) => {
   const { data } = await api.patch(`/api/provisioning/tenants/${tenantId}/admin`, datos);
   return data.data;
 };
+
+// POST /api/provisioning/tenants/:tenantId/habilitar-pos — habilita POS en una
+// empresa creada "solo DTE" (rol plataforma). Devuelve la API Key técnica UNA
+// sola vez (el valor nunca se vuelve a exponer).
+export const habilitarPosTenantApi = async (tenantId, datos) => {
+  const { data } = await api.post(`/api/provisioning/tenants/${tenantId}/habilitar-pos`, datos);
+  return data.data;
+};

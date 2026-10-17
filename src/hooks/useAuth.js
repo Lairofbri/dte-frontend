@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { loginApi, logoutApi } from '../api/auth.api';
-import { useAuthStore } from '../store/auth.store';
+import { useAuthStore, obtenerRoles } from '../store/auth.store';
 
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +27,7 @@ export const useAuth = () => {
       // post-login; con una sola activa se auto-selecciona). El operador
       // sigue directo: su establecimiento es fijo (JWT).
       navigate(
-        resultado.usuario?.rol === 'administrador'
+        obtenerRoles(resultado.usuario).includes('administrador')
           ? '/seleccionar-sucursal'
           : '/dashboard'
       );
