@@ -58,6 +58,7 @@ const Onboarding = () => {
     crearEmpresa, creando,
     actualizarEmpresa, actualizando,
     habilitarPos, habilitandoPos,
+    reintentarSync, reintentandoSync,
   } = useEstadoProvision();
 
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -378,6 +379,19 @@ const Onboarding = () => {
                 <Pencil className="w-4 h-4" />
                 Editar
               </Button>
+              {fila.tiene_pos || fila.eventos_fallidos > 0 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => reintentarSync(fila.id)}
+                  disabled={reintentandoSync}
+                  aria-label={`Reintentar sincronización POS de ${nombreVisible(fila)}`}
+                  title="Destrabar la entrega de eventos al POS (re-publica el alta y reactiva los fallidos)"
+                >
+                  <RefreshCw className={`w-4 h-4 ${reintentandoSync ? 'animate-spin' : ''}`} />
+                  Reintentar sync
+                </Button>
+              ) : null}
               {!fila.tiene_pos ? (
                 <Button
                   variant="ghost"

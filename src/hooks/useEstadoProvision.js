@@ -10,6 +10,7 @@ import {
   actualizarTenantPlataformaApi,
   actualizarAdminTenantPlataformaApi,
   habilitarPosTenantApi,
+  reintentarSyncTenantApi,
 } from '../api/provisioning.api';
 
 export const useEstadoProvision = ({ enabled = true } = {}) => {
@@ -20,6 +21,7 @@ export const useEstadoProvision = ({ enabled = true } = {}) => {
   const [creando,           setCreando]           = useState(false);
   const [actualizando,      setActualizando]      = useState(false);
   const [habilitandoPos,    setHabilitandoPos]    = useState(false);
+  const [reintentandoSync,   setReintentandoSync]   = useState(false);
 
   useEffect(() => {
     let cancelado = false;
@@ -139,6 +141,23 @@ export const useEstadoProvision = ({ enabled = true } = {}) => {
     }
   }, [recargar]);
 
+  const reintentarSync = useCallback(async (tenantId) => {
+    setReintentandoSync(true);
+    try {
+      const resultado = await reintentarSyncTenantApi(tenantId);
+      const n = resultado?.eventos_reactivados ?? 0;
+      toast.success(
+        n > 0
+          ? `Sincronización reintentada (${n} evento${n === 1 ? '' : 's'} reactivado${n === 1 ? '' : 's'}).`
+          : 'Sincronización reintentada. No había eventos fallidos.'
+      );
+      recargar();
+      return resultado;
+    } finally {
+      setReintentandoSync(false);
+    }
+  }, [recargar]);
+
   return {
     tenants: enabled ? tenants : [],
     isLoading: enabled && isLoading,
@@ -146,9 +165,11 @@ export const useEstadoProvision = ({ enabled = true } = {}) => {
     creando,
     actualizando,
     habilitandoPos,
+    reintentandoSync,
     recargar,
     crearEmpresa,
     actualizarEmpresa,
     habilitarPos,
+    reintentarSync,
   };
 };

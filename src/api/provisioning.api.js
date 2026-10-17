@@ -38,3 +38,10 @@ export const habilitarPosTenantApi = async (tenantId, datos) => {
   const { data } = await api.post(`/api/provisioning/tenants/${tenantId}/habilitar-pos`, datos);
   return data.data;
 };
+
+// POST /api/provisioning/tenants/:tenantId/reintentar-sync — destraba la
+// entrega de eventos al POS (re-publica TENANT_CREADO y reactiva los fallidos).
+export const reintentarSyncTenantApi = async (tenantId) => {
+  const { data } = await api.post(`/api/provisioning/tenants/${tenantId}/reintentar-sync`);
+  return data.data;
+};
