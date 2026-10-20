@@ -12,7 +12,7 @@ import { z }                       from 'zod';
 import { toast }                   from 'react-hot-toast';
 import {
   AlertTriangle, Building2, CheckCircle,
-  Eye, EyeOff, KeyRound, Loader2,
+  Eye, EyeOff, Image as ImageIcon, KeyRound, Loader2,
   RefreshCw, Save, Wifi, XCircle,
 } from 'lucide-react';
 import {
@@ -25,6 +25,8 @@ import {
 } from '../api/configuracion.api';
 import { obtenerCatalogoApi } from '../api/catalogos.api';
 import { obtenerEstadoProvisionApi } from '../api/provisioning.api';
+import { useAuthStore, selectEsAdmin, selectTenantId } from '../store/auth.store';
+import LogoEmpresa from '../components/empresas/LogoEmpresa';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/shadcn/card';
 import { Button } from '../components/shadcn/button';
 import { Input } from '../components/shadcn/input';
@@ -174,6 +176,9 @@ const AvisoCambios = ({ visible }) =>
 // COMPONENTE PRINCIPAL
 // ─────────────────────────────────────────────
 const Configuracion = () => {
+  const tenantId = useAuthStore(selectTenantId);
+  const esAdmin  = useAuthStore(selectEsAdmin);
+
   const [isLoading,        setIsLoading]        = useState(true);
   const [isSavingDatos,    setIsSavingDatos]    = useState(false);
   const [isSavingCreds,    setIsSavingCreds]    = useState(false);
@@ -185,6 +190,9 @@ const Configuracion = () => {
   const [estadoHacienda,   setEstadoHacienda]   = useState(null);
   const [estadoFirma,      setEstadoFirma]      = useState(null);
   const [tieneApiKey,      setTieneApiKey]      = useState(null);
+  // Logo de la empresa (Fase 3 del spec de PDF fiscal): undefined = cargando,
+  // null = no se pudo leer el estado, boolean = valor del status.
+  const [tieneLogo,        setTieneLogo]        = useState(undefined);
   const [esProduccion,     setEsProduccion]     = useState(false);
   const [error,            setError]            = useState(null);
   // Catálogos CAT-019 (actividades) y CAT-009 (tipo de establecimiento)
@@ -327,17 +335,28 @@ const Configuracion = () => {
       }
       try {
         const tenants = await obtenerEstadoProvisionApi();
-        const propio = tenants?.[0];
-        if (!cancelado) setTieneApiKey(propio?.tiene_api_key ?? false);
+        // Para un administrador el status trae solo su tenant; para plataforma
+        // trae todos, así que se busca por el tenant del JWT (nunca [0]).
+        // Comparación case-insensitive: el backend normaliza a minúsculas.
+        const propio = tenants?.find(
+          (t) => String(t.id).toLowerCase() === String(tenantId).toLowerCase()
+        ) ?? null;
+        if (!cancelado) {
+          setTieneApiKey(propio?.tiene_api_key ?? false);
+          setTieneLogo(propio ? !!propio.tiene_logo : false);
+        }
       } catch {
-        if (!cancelado) setTieneApiKey(null);
+        if (!cancelado) {
+          setTieneApiKey(null);
+          setTieneLogo(null);
+        }
       }
     };
 
     cargar();
     cargarFirmaYApiKey();
     return () => { cancelado = true; };
-  }, [resetDatos, resetCredenciales]);
+  }, [resetDatos, resetCredenciales, tenantId]);
 
   // ── Guardar datos del emisor ──
   // NIT/NRC/teléfono se normalizan a solo dígitos (Hacienda los recibe
@@ -709,6 +728,29 @@ const Configuracion = () => {
               </div>
             </Card>
           </form>
+
+          {/* SECCIÓN 1b — Logo de la empresa (Fase 3 del spec de PDF fiscal).
+              Es identidad de la empresa, no una credencial: va entre los datos
+              del emisor y las credenciales Hacienda. Plataforma lo administra
+              desde Onboarding, por eso acá se muestra solo al administrador. */}
+          {esAdmin && tenantId && (
+            <Card>
+              <CardHeader className="border-b bg-gray-50/60">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ImageIcon className="h-4 w-4 text-primary" aria-hidden="true" />
+                  Logo de la empresa
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <LogoEmpresa
+                  key={tenantId}
+                  tenantId={tenantId}
+                  tieneLogoInicial={tieneLogo}
+                  onCambio={(resultado) => setTieneLogo(!!resultado?.tiene_logo)}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           {/* SECCIÓN 2 — Credenciales oficiales Hacienda (guardado independiente) */}
           <form onSubmit={handleSubmitCredenciales(onSubmitCredenciales)} noValidate>

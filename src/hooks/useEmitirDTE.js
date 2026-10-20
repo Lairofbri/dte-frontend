@@ -213,11 +213,8 @@ export const useEmitirDTE = () => {
       else throw new Error('Tipo de DTE no soportado.');
 
       toast.success('DTE emitido correctamente.');
-      // Auto-impresión: el detalle consume este estado una sola vez (una recarga
-      // o volver atrás no reimprime). La impresión nunca revierte la emisión.
-      navigate(`/dtes/${resultado.codigo_generacion}`, {
-        state: { imprimirAlEmitir: true, codigoGeneracion: resultado.codigo_generacion },
-      });
+      // El PDF fiscal se genera a pedido desde el detalle. Emitir no imprime.
+      navigate(`/dtes/${resultado.codigo_generacion}`);
     } catch (err) {
       const mensaje = err.response?.data?.mensaje || 'No se pudo emitir el DTE.';
       toast.error(mensaje);

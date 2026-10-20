@@ -13,7 +13,6 @@ import DTEListado      from '../pages/DTEs/DTEListado';
 import DTEDetalle      from '../pages/DTEs/DTEDetalle';
 import DTEEmitir       from '../pages/DTEs/DTEEmitir';
 import Configuracion   from '../pages/Configuracion';
-import Impresion       from '../pages/Impresion';
 import Establecimientos from '../pages/Establecimientos';
 import SeleccionarSucursal from '../pages/SeleccionarSucursal';
 import Usuarios        from '../pages/Usuarios';
@@ -72,8 +71,10 @@ const router = createBrowserRouter([
         element: <AdminRoute><Configuracion /></AdminRoute>,
       },
       {
+        // La impresión térmica local se retiró del DTE Frontend (spec PDF
+        // fiscal, Fase 3). El redirect conserva bookmarks sin dejar la página.
         path:    'impresion',
-        element: <AdminRoute><Impresion /></AdminRoute>,
+        element: <Navigate to="/dashboard" replace />,
       },
       {
         path:    'establecimientos',

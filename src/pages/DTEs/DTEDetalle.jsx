@@ -1,22 +1,20 @@
 // src/pages/DTEs/DTEDetalle.jsx
 // Detalle completo de un DTE con timeline, QR y opción de anulación
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { QRCodeSVG }      from 'qrcode.react';
 import { toast }          from 'react-hot-toast';
 import {
   ArrowLeft, XCircle, RefreshCw,
-  CheckCircle, Clock, Send, FileX, Printer,
+  CheckCircle, Clock, Send, FileX, FileDown,
 } from 'lucide-react';
 import { useDTEDetalle }  from '../../hooks/useDTEDetalle';
 import ModalAnulacion     from '../../components/dtes/ModalAnulacion';
 import Badge              from '../../components/ui/Badge';
 import Button             from '../../components/ui/Button';
 import Spinner            from '../../components/ui/Spinner';
-import {
-  obtenerConfigAgente, imprimirTicketDte, agenteConfigurado, esErrorImpresion,
-} from '../../services/printingService';
+import { obtenerPdfDteApi } from '../../api/reportes.api';
 import {
   formatMonto,
   formatFecha,
@@ -95,60 +93,47 @@ const TimelineDTE = ({ estado }) => {
 const DTEDetalle = () => {
   const { codigo }  = useParams();
   const navigate    = useNavigate();
-  const location    = useLocation();
   const [modalAbierto, setModalAbierto] = useState(false);
-  const [imprimiendo, setImprimiendo]   = useState(false);
-  // La auto-impresión se dispara una sola vez por emisión (el estado de
-  // navegación se consume al imprimir: recargar o volver atrás no reimprime).
-  const autoImpresoRef = useRef(false);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
 
   // Todos los hooks ANTES de cualquier return condicional
   const { dte, isLoading, error, anulando, recargar, anular } = useDTEDetalle(codigo);
 
   /**
-   * Imprime el comprobante fiscal por el agente local. No emite ni modifica
-   * nada: el backend rechaza con 409 un DTE que no esté aceptado y la emisión
-   * nunca se revierte por un fallo de impresión (verificar.txt §5/§12).
+   * Descarga el PDF fiscal A4 que genera la API de Reportes desde json_dte.
+   * No emite ni modifica nada; el backend responde 409 si el estado no lo
+   * permite y la emisión nunca se revierte por un fallo del PDF.
    */
-  const imprimir = useCallback(async ({ respetarAuto = false } = {}) => {
+  const generarPdf = async () => {
     if (!dte?.codigo_generacion) return;
 
-    const config = await obtenerConfigAgente().catch(() => null);
-
-    if (respetarAuto) {
-      // Sin token configurado o con la auto-impresión apagada no se intenta:
-      // el usuario puede imprimir a mano desde el botón.
-      if (!agenteConfigurado()) return;
-      if (!config?.impresion?.autoImpresion) return;
-    }
-
-    setImprimiendo(true);
+    setGenerandoPdf(true);
     try {
-      const resultado = await imprimirTicketDte(dte.codigo_generacion, {
-        papelMm: config?.impresion?.papelMm,
-      });
-      toast.success(`Comprobante enviado a impresión (${resultado.bytes} bytes).`);
+      const blob = await obtenerPdfDteApi(dte.codigo_generacion);
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = `DTE-${dte.numero_control ?? dte.codigo_generacion}.pdf`;
+      document.body.appendChild(enlace);
+      enlace.click();
+      enlace.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
     } catch (err) {
-      toast.error(
-        esErrorImpresion(err)
-          ? err.message
-          : 'No se pudo enviar el comprobante a la impresora.',
-      );
+      const data = err?.response?.data;
+      let mensaje = 'No se pudo generar el PDF.';
+      if (data instanceof Blob) {
+        try {
+          const json = JSON.parse(await data.text());
+          mensaje = json.error ?? json.mensaje ?? mensaje;
+        } catch {
+          // El backend no devolvió JSON: se conserva el mensaje genérico.
+        }
+      }
+      toast.error(mensaje);
     } finally {
-      setImprimiendo(false);
+      setGenerandoPdf(false);
     }
-  }, [dte]);
-
-  useEffect(() => {
-    if (!dte || autoImpresoRef.current) return;
-    if (!location.state?.imprimirAlEmitir) return;
-
-    autoImpresoRef.current = true;
-    navigate(location.pathname, { replace: true, state: null });
-    // Diferido para no llamar setState de forma sincrónica dentro del efecto.
-    const temporizador = setTimeout(() => void imprimir({ respetarAuto: true }), 0);
-    return () => clearTimeout(temporizador);
-  }, [dte, location.state, location.pathname, navigate, imprimir]);
+  };
 
   if (isLoading) {
     return (
@@ -187,6 +172,9 @@ const DTEDetalle = () => {
   const esFcf = dte.tipo_dte === '01';
 
   const puedeAnular = dte.estado === 'aceptado';
+  // El PDF fiscal existe para un DTE recibido por Hacienda; el anulado se
+  // conserva con marca de agua.
+  const puedeGenerarPdf = ['aceptado', 'anulado'].includes(dte.estado);
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -210,12 +198,16 @@ const DTEDetalle = () => {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => void imprimir()}
-            isLoading={imprimiendo}
-            ariaLabel="Imprimir el comprobante fiscal en la impresora térmica"
+            onClick={() => void generarPdf()}
+            isLoading={generandoPdf}
+            disabled={!puedeGenerarPdf}
+            ariaLabel="Generar el PDF fiscal A4 del DTE"
+            title={puedeGenerarPdf
+              ? 'Generar PDF fiscal A4'
+              : `El PDF fiscal solo está disponible para DTEs aceptados o anulados (estado: ${dte.estado})`}
           >
-            <Printer className="w-4 h-4" aria-hidden="true" />
-            Imprimir
+            <FileDown className="w-4 h-4" aria-hidden="true" />
+            Generar PDF
           </Button>
           {puedeAnular && (
             <Button

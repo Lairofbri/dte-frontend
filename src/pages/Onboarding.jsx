@@ -16,6 +16,7 @@ import Button                 from '../components/ui/Button';
 import Spinner                from '../components/ui/Spinner';
 import Modal                  from '../components/ui/Modal';
 import Input                  from '../components/ui/Input';
+import LogoEmpresa            from '../components/empresas/LogoEmpresa';
 
 const INFO_ESTADO = {
   provisioning:        { label: 'Provisionando',      variant: 'yellow' },
@@ -793,6 +794,28 @@ const Onboarding = () => {
                   placeholder="Repite la contraseña"
                 />
               </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-4">
+              <p className="text-sm font-medium text-gray-800 mb-1">
+                Logo de la empresa
+              </p>
+              <p className="text-xs text-gray-500 mb-3">
+                Aparece en el encabezado del PDF fiscal del DTE. Si la empresa no
+                tiene logo, el PDF se genera sin imagen. El logo se guarda al
+                instante, sin esperar a «Guardar cambios».
+              </p>
+              <LogoEmpresa
+                key={tenantEditando.id}
+                tenantId={tenantEditando.id}
+                tieneLogoInicial={tenantEditando.tiene_logo ?? false}
+                onCambio={(resultado) => {
+                  setTenantEditando((prev) => (
+                    prev ? { ...prev, tiene_logo: !!resultado?.tiene_logo } : prev
+                  ));
+                  recargar();
+                }}
+              />
             </div>
 
             {errorEdit ? (

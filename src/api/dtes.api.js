@@ -21,23 +21,6 @@ export const obtenerDTEApi = async (codigoGeneracion) => {
 };
 
 /**
- * Comprobante fiscal en **bytes ESC/POS** para el agente local (AmberPrint).
- * No imprime ni modifica nada: reimprimir es idempotente respecto de la emisión.
- * El backend responde **409** si el DTE todavía no está `aceptado`.
- * `papel_mm`/`caracteres_x_linea` salen de las preferencias del agente (por equipo).
- */
-export const obtenerTicketEscposApi = async (codigoGeneracion, { papelMm, caracteresXLinea } = {}) => {
-  const { data } = await api.get(`/api/dte/${codigoGeneracion}/ticket-escpos`, {
-    params: {
-      ...(papelMm ? { papel_mm: papelMm } : {}),
-      ...(caracteresXLinea ? { caracteres_x_linea: caracteresXLinea } : {}),
-    },
-    responseType: 'arraybuffer',
-  });
-  return new Uint8Array(data);
-};
-
-/**
  * Emitir una Factura Consumidor Final (FCF)
  */
 export const emitirFCFApi = async (datos) => {

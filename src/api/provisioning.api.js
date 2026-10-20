@@ -45,3 +45,28 @@ export const reintentarSyncTenantApi = async (tenantId) => {
   const { data } = await api.post(`/api/provisioning/tenants/${tenantId}/reintentar-sync`);
   return data.data;
 };
+
+// PUT /api/provisioning/tenants/:tenantId/logo — logo de la empresa para el
+// encabezado del PDF fiscal (rol administrador del tenant o plataforma).
+// Va como multipart/form-data (campo `logo`). El Content-Type se fija a
+// multipart a propósito: la instancia compartida usa application/json por
+// defecto y, con ese valor, axios serializaría el FormData a JSON. En el
+// navegador axios quita el header y deja que el browser agregue el boundary.
+// El backend valida PNG ≤ 1 MB y normaliza a 600×200 px (sharp).
+export const actualizarLogoTenantApi = async (tenantId, archivo) => {
+  const formulario = new FormData();
+  formulario.append('logo', archivo);
+  const { data } = await api.put(
+    `/api/provisioning/tenants/${tenantId}/logo`,
+    formulario,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return data.data;
+};
+
+// DELETE /api/provisioning/tenants/:tenantId/logo — quita el logo. El PDF
+// vuelve a generarse sin imagen (nunca se usa un placeholder).
+export const eliminarLogoTenantApi = async (tenantId) => {
+  const { data } = await api.delete(`/api/provisioning/tenants/${tenantId}/logo`);
+  return data.data;
+};

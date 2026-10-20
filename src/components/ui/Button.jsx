@@ -26,6 +26,7 @@ const Button = ({
   onClick,
   className = '',
   ariaLabel,
+  title,
   fullWidth = false,
 }) => {
   const claseVariante = VARIANTES[variant] ?? VARIANTES.primary;
@@ -38,6 +39,7 @@ const Button = ({
       disabled={disabled || isLoading}
       aria-label={ariaLabel}
       aria-busy={isLoading}
+      title={title}
       className={`
         ${claseVariante}
         ${claseTamaño}
